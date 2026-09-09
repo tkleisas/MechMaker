@@ -29,6 +29,39 @@ public readonly record struct Quat(double W, double X, double Y, double Z)
         return (qz * qy) * qx;
     }
 
+    /// <summary>
+    /// Inverse of <see cref="FromEulerXyz"/>: extrinsic XYZ Euler angles in radians.
+    /// At the gimbal singularity (middle angle ±90°) the free twist is folded into
+    /// the X angle with Z set to zero, so the round trip always reproduces the input.
+    /// </summary>
+    public Vec3 ToEulerXyz()
+    {
+        // R = Rz·Ry·Rx matrix entries (row, col):
+        var r00 = 1 - 2 * (Y * Y + Z * Z);
+        var r10 = 2 * (X * Y + W * Z);
+        var r20 = 2 * (X * Z - W * Y);
+        var r21 = 2 * (Y * Z + W * X);
+        var r22 = 1 - 2 * (X * X + Y * Y);
+        var r01 = 2 * (X * Y - W * Z);
+        var r11 = 1 - 2 * (X * X + Z * Z);
+
+        var cy = Math.Sqrt(r21 * r21 + r22 * r22);
+        var x = Math.Atan2(r21, r22);
+        var y = Math.Atan2(-r20, cy);
+        var z = Math.Atan2(r10, r00);
+
+        if (cy < 1e-10)
+        {
+            // Gimbal lock: only the X±Z combination is determined. Set Z = 0 and
+            // recover the combination from R01/R11 (derived for θy = ±90°).
+            var combination = Math.Atan2(r01, r11);
+            x = r20 > 0 ? -combination : combination; // θy=+90° keeps (Z−X), θy=−90° keeps (Z+X)
+            y = r20 < 0 ? Math.PI / 2 : -Math.PI / 2;
+            z = 0;
+        }
+        return new Vec3(x, y, z);
+    }
+
     public static Quat operator *(Quat a, Quat b) => new(
         a.W * b.W - a.X * b.X - a.Y * b.Y - a.Z * b.Z,
         a.W * b.X + a.X * b.W + a.Y * b.Z - a.Z * b.Y,

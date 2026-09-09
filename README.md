@@ -28,7 +28,7 @@ catalog (parts) ──►  machine.json  ◄── visual builder (primary UI)
 - Validation output is a structured report (stall margins, belt ratios, unconnected
   connectors, BOM) — machine-readable for CI and LLMs, readable for humans.
 
-## Status — M2 (virtual MCU + closed loop), pre-alpha
+## Status — M3 (visual builder), pre-alpha
 
 What works today:
 
@@ -54,28 +54,66 @@ What works today:
   revolution (correct GT2-20T kinematics), an endstop fires on arrival, commanding
   20 rev/s without ramp stalls the motor with counted missed steps, and repeated
   runs are bitwise identical.
+- **Visual builder** (`MechMaker.App`, Avalonia + software-rasterized 3D viewport):
+  catalog list, orbit/zoom viewport, part placement, **connector-snapped placement**
+  (pick a part connector + a target connector — the pose is computed with the same
+  mating convention the compiler uses), selection highlight, pose editing,
+  connections, **board wiring UI**, adjustable **reference grid** (color, thickness,
+  spacing), and live run mode with adjustable rev/s.
+- **Lua scenarios** (`MechMaker.Engine.Scripting`, MoonSharp, sandboxed): deterministic
+  scripted simulations — the script plays the host role (drive motors, watch endstops,
+  detect stalls) like the C# tests, but authored at runtime. `scripts/axis_home.lua`
+  homes the example axis. Run from the app ("Run Script…"), the MCP server, or tests.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (16 tests: catalog, validation, compiler placement math,
-  live physics, MCU closed loop).
+- **Tests**: `dotnet test` (109 tests: core math/compile, engine physics, Lua scenarios,
+  server/session).
+- **MCP server** (`MechMaker.Server`): 27 tools over stdio that let LLM agents assemble,
+  wire, validate, compile, and simulate machines — catalog browsing, part placement,
+  typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
+  compilation, and live closed-loop runs (enable/command motors, add endstops, watch
+  for stalls).
 
 Two modeling lessons are baked in and documented in code: the physics runs at 8 kHz
 because the stepper's magnetic spring is stiff, and the ground plane is visual-only
 (assemblies are bolted to their own structure — a colliding floor shreds any shaft
 that sits at z=0).
 
+### Wiring the MCP server into a client
+
+```json
+{
+  "mcpServers": {
+    "mechmaker": {
+      "command": "dotnet",
+      "args": ["run", "--project", "src/MechMaker.Server", "--no-build"],
+      "cwd": "/path/to/MechMaker"
+    }
+  }
+}
+```
+
+The catalog directory is found by walking up from the working directory (or set
+`MECHMAKER_CATALOG`). Typical agent flow: `list_catalog_parts` → `add_part` /
+`add_connection` / `add_board` / `wire` → `validate_machine` → `start_run` →
+`enable_motor` + `set_motor_velocity` → `run_for` / `read_endstop` → `save_machine`.
+
 ## Roadmap
 
-- **M3 — Visual builder**: Avalonia + Silk.NET 3D viewport; place, snap, wire, run.
-- **M4 — MCP server**: LLM agents assemble/wire/validate machines through tools.
+- ~~**M3 — Visual builder**~~ **done**: Avalonia + software 3D viewport; place, snap,
+  wire, run (`src/MechMaker.App`).
+- ~~**M4 — MCP server**~~ **done**: LLM agents assemble/wire/validate/simulate machines
+  through 27 tools over stdio (`src/MechMaker.Server`).
 - **M5 — Real Klipper host** on the virtual MCU (host sends step commands over the
   Klipper MCU protocol instead of velocity targets); catalog growth (leadscrews,
-  servos, gears, fans, hotends...); homing scenarios on the closed loop.
+  servos, gears, fans, hotends...). The Lua scenario runner is the first taste of
+  M5's "homing scenarios on the closed loop".
 
 ## Layout
 
 ```
 catalog/                 part definitions (JSON)
 examples/                example machines
+scripts/                 Lua simulation scenarios
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
 src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU

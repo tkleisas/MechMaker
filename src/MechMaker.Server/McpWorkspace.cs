@@ -1,0 +1,402 @@
+using MechMaker.Core;
+using MechMaker.Core.Compilation;
+using MechMaker.Core.Model;
+using MechMaker.Core.Validation;
+using MechMaker.Engine;
+using MechMaker.Engine.Scripting;
+
+namespace MechMaker.Server;
+
+/// <summary>
+/// Session state behind the MCP tools: the part catalog, the machine under
+/// construction, and at most one live run (compiled model + virtual MCU).
+/// Instantiable for tests; the MCP layer drives the <see cref="Instance"/> singleton
+/// (tool classes are constructed by the SDK without DI).
+/// </summary>
+public sealed class McpWorkspace : IDisposable
+{
+    public static readonly McpWorkspace Instance = new();
+
+    private const int MaxRunSeconds = 10;
+
+    private MachineDefinition _machine = new() { Name = "new_machine" };
+    private MachineSimulation? _run;
+    private readonly List<EndstopSpec> _endstopSpecs = [];
+    private readonly Dictionary<string, EndstopChannel> _endstops = new(StringComparer.Ordinal);
+    private int _connectionCounter;
+
+    public PartCatalog Catalog { get; }
+    public MachineDefinition Machine => _machine;
+    public string? MachinePath { get; private set; }
+
+    public McpWorkspace(string? catalogDirectory = null)
+    {
+        Catalog = PartCatalog.LoadFromDirectory(catalogDirectory ?? FindCatalogDirectory());
+    }
+
+    // ---------- catalog ----------
+
+    private static string FindCatalogDirectory()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("MECHMAKER_CATALOG");
+        if (!string.IsNullOrEmpty(fromEnv) && Directory.Exists(fromEnv))
+            return fromEnv;
+
+        foreach (var start in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            var dir = new DirectoryInfo(start);
+            while (dir is not null)
+            {
+                if (Directory.Exists(Path.Combine(dir.FullName, "catalog")))
+                    return Path.Combine(dir.FullName, "catalog");
+                dir = dir.Parent!;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "No 'catalog' directory found upward from the working directory. " +
+            "Set MECHMAKER_CATALOG to the catalog directory.");
+    }
+
+    // ---------- machine file ----------
+
+    public string NewMachine(string name)
+    {
+        StopRun();
+        _machine = new MachineDefinition { Name = name };
+        _connectionCounter = 0;
+        // A fresh session has no open file — default the save location to the CWD.
+        MachinePath = Path.Combine(Path.GetDirectoryName(MachinePath) ?? Environment.CurrentDirectory, $"{name}.json");
+        return $"Machine '{name}' created ({_machine.Parts.Count} parts).";
+    }
+
+    public string OpenMachine(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (!File.Exists(full))
+            throw new FileNotFoundException($"Machine file not found: {full}");
+
+        StopRun();
+        _machine = CoreJson.Deserialize<MachineDefinition>(File.ReadAllText(full));
+        MachinePath = full;
+        _connectionCounter = _machine.Connections.Count;
+        return $"Machine '{_machine.Name}' loaded from '{full}': " +
+               $"{_machine.Parts.Count} parts, {_machine.Connections.Count} connections, " +
+               $"{_machine.Boards.Count} boards, {_machine.Wiring.Count} wires.";
+    }
+
+    public string SaveMachine(string? path = null)
+    {
+        var full = Path.GetFullPath(path ?? MachinePath
+            ?? throw new InvalidOperationException("No path given and no machine file open."));
+        File.WriteAllText(full, CoreJson.Serialize(_machine));
+        MachinePath = full;
+        return $"Machine '{_machine.Name}' saved to '{full}'.";
+    }
+
+    // ---------- validation & compilation ----------
+
+    public ValidationReport Validate() => new MachineValidator(Catalog).Validate(_machine);
+
+    public (string Mjcf, ValidationReport Report) Compile()
+    {
+        var compiler = new MjcfCompiler(Catalog);
+        var mjcf = compiler.Compile(_machine).ToString();
+        return (mjcf, compiler.LastReport);
+    }
+
+    // ---------- parts ----------
+
+    public string AddPart(string catalogId, string? instanceId = null, double? x = null, double? y = null, double? z = null,
+        double rx = 0, double ry = 0, double rz = 0)
+    {
+        var definition = Catalog.Get(catalogId); // throws with a clear message for unknown ids
+        instanceId ??= UniqueInstanceId(catalogId);
+        if (_machine.Parts.Any(p => p.Id == instanceId))
+            throw new InvalidOperationException($"Part instance id '{instanceId}' already exists.");
+
+        x ??= 0;
+        y ??= 0;
+        z ??= StackZ(); // above everything already placed, so nothing overlaps by default
+
+        _machine = _machine with
+        {
+            Parts = [.. _machine.Parts, new PartInstance
+            {
+                Id = instanceId,
+                Part = catalogId,
+                Pose = new Pose
+                {
+                    Position = new MechMaker.Core.Mathematics.Vec3(x.Value, y.Value, z.Value),
+                    RotationEulerDeg = new MechMaker.Core.Mathematics.Vec3(rx, ry, rz)
+                }
+            }]
+        };
+        return $"Placed '{instanceId}' (catalog '{catalogId}') at ({x:0.###}, {y:0.###}, {z:0.###}) m.";
+    }
+
+    private string UniqueInstanceId(string catalogId)
+    {
+        for (var i = 1; ; i++)
+        {
+            var candidate = $"{catalogId}_{i}";
+            if (_machine.Parts.All(p => p.Id != candidate))
+                return candidate;
+        }
+    }
+
+    private double StackZ()
+    {
+        // Rough placement: spread parts vertically; the pose tool refines it.
+        return 0.05 * _machine.Parts.Count;
+    }
+
+    public string UpdatePartPose(string instanceId, double x, double y, double z,
+        double rx = 0, double ry = 0, double rz = 0)
+    {
+        ThrowIfUnknownPart(instanceId);
+        _machine = _machine with
+        {
+            Parts = [.. _machine.Parts.Select(p => p.Id == instanceId
+                ? p with
+                {
+                    Pose = new Pose
+                    {
+                        Position = new MechMaker.Core.Mathematics.Vec3(x, y, z),
+                        RotationEulerDeg = new MechMaker.Core.Mathematics.Vec3(rx, ry, rz)
+                    }
+                }
+                : p)]
+        };
+        return $"Pose of '{instanceId}' set to ({x:0.###}, {y:0.###}, {z:0.###}) m, " +
+               $"rot ({rx:0.#}, {ry:0.#}, {rz:0.#}) deg.";
+    }
+
+    public string DeletePart(string instanceId)
+    {
+        ThrowIfUnknownPart(instanceId);
+        _machine = _machine with
+        {
+            Parts = [.. _machine.Parts.Where(p => p.Id != instanceId)],
+            Connections = [.. _machine.Connections.Where(c => c.PartA != instanceId && c.PartB != instanceId)],
+            Wiring = [.. _machine.Wiring.Where(w => w.Component != instanceId)]
+        };
+        return $"Deleted '{instanceId}' (and its connections and wiring).";
+    }
+
+    // ---------- connections ----------
+
+    public string AddConnection(string partA, string connectorA, string partB, string connectorB)
+    {
+        var connector = FindConnectorOrThrow(partA, connectorA);
+        var other = FindConnectorOrThrow(partB, connectorB);
+
+        var id = $"c{++_connectionCounter}";
+        while (_machine.Connections.Any(c => c.Id == id))
+            id += "x";
+
+        _machine = _machine with
+        {
+            Connections = [.. _machine.Connections, new Connection
+            {
+                Id = id, PartA = partA, ConnectorA = connectorA, PartB = partB, ConnectorB = connectorB
+            }]
+        };
+        return $"Connected {partA}.{connectorA} <-> {partB}.{connectorB} as '{id}' " +
+               $"({connector.Type} <-> {other.Type}).";
+    }
+
+    public string DeleteConnection(string connectionId)
+    {
+        if (!_machine.Connections.Any(c => c.Id == connectionId))
+            throw new KeyNotFoundException($"No connection '{connectionId}'.");
+        _machine = _machine with { Connections = [.. _machine.Connections.Where(c => c.Id != connectionId)] };
+        return $"Deleted connection '{connectionId}'.";
+    }
+
+    public IReadOnlyList<MechMaker.Core.Model.ConnectorDefinition> ConnectorsOf(string instanceId)
+    {
+        ThrowIfUnknownPart(instanceId);
+        return Catalog.Get(_machine.Parts.First(p => p.Id == instanceId).Part).Connectors;
+    }
+
+    private MechMaker.Core.Model.ConnectorDefinition FindConnectorOrThrow(string partId, string connectorName)
+    {
+        ThrowIfUnknownPart(partId);
+        var definition = Catalog.Get(_machine.Parts.First(p => p.Id == partId).Part);
+        var connector = definition.Connectors.FirstOrDefault(c => c.Name == connectorName);
+        if (connector is null)
+        {
+            var names = string.Join(", ", definition.Connectors.Select(c => c.Name));
+            throw new KeyNotFoundException(
+                $"Part '{partId}' (catalog '{definition.Id}') has no connector '{connectorName}'. Available: {names}");
+        }
+        return connector;
+    }
+
+    private void ThrowIfUnknownPart(string instanceId)
+    {
+        if (!_machine.Parts.Any(p => p.Id == instanceId))
+            throw new KeyNotFoundException(
+                $"No part instance '{instanceId}'. Known: {string.Join(", ", _machine.Parts.Select(p => p.Id))}");
+    }
+
+    // ---------- boards & wiring ----------
+
+    public string AddBoard(string boardId, string type = "skr-pico")
+    {
+        if (_machine.Boards.Any(b => b.Id == boardId))
+            throw new InvalidOperationException($"Board '{boardId}' already exists.");
+        _machine = _machine with
+        {
+            Boards = [.. _machine.Boards, new BoardDefinition { Id = boardId, Type = type }]
+        };
+        return $"Board '{boardId}' ({type}) added.";
+    }
+
+    public string Wire(string component, string signal, string board, string pin)
+    {
+        ThrowIfUnknownPart(component);
+        if (_machine.Boards.Count == 0)
+            throw new InvalidOperationException("No board to wire to — add one first (add_board).");
+        if (!_machine.Boards.Any(b => b.Id == board))
+            throw new KeyNotFoundException($"No board '{board}'. Known: {string.Join(", ", _machine.Boards.Select(b => b.Id))}");
+
+        _machine = _machine with
+        {
+            Wiring = [.. _machine.Wiring.Where(w => !(w.Component == component && w.Signal == signal)),
+                new Wire { Component = component, Signal = signal, Board = board, Pin = pin }]
+        };
+        return $"Wired {component}.{signal} -> {board}.{pin}.";
+    }
+
+    // ---------- scenarios (Lua) ----------
+
+    public string RunScenarioFile(string path) => RunScenario(LuaScenario.LoadFile(path));
+
+    public string RunScenarioSource(string source) => RunScenario(LuaScenario.Parse(source));
+
+    private string RunScenario(LuaScenario scenario)
+    {
+        StopRun(); // a scenario gets its own simulation session
+        using var simulation = MachineSimulation.FromMachine(_machine, Catalog);
+        return scenario.Run(simulation).ToString();
+    }
+
+    // ---------- run mode ----------
+
+    public string StartRun(int microsteps = 16)
+    {
+        StopRun();
+        _run = MachineSimulation.FromMachine(_machine, Catalog, microsteps);
+        // Channels start disabled, like firmware — energize the ones you drive.
+        _endstops.Clear();
+        foreach (var spec in _endstopSpecs)
+            _endstops[spec.JointName] = _run.Mcu.AddEndstop(spec.JointName, spec.TriggerPosition, spec.DebounceTicks);
+
+        var motors = WiredSteppers().Select(id => id).ToList();
+        return $"Run started: {_run.Simulator.BuildReport().BodyCount} bodies, {motors.Count} stepper channel(s) " +
+               $"({string.Join(", ", motors)}), {_endstops.Count} endstop(s).";
+    }
+
+    public string RunFor(double seconds)
+    {
+        var run = RequireRun();
+        if (seconds is < 0.001 or > MaxRunSeconds)
+            throw new ArgumentOutOfRangeException(nameof(seconds), $"Run duration must be 0.001–{MaxRunSeconds} s.");
+        run.RunFor(seconds);
+        return $"Ran {seconds:0.###} s (t={run.Simulator.Time:0.###} s).\n{BuildStatusText()}";
+    }
+
+    public string SetMotorVelocity(string instanceId, double revPerSec)
+    {
+        var run = RequireRun();
+        var channel = run.Stepper(instanceId); // throws if not wired
+        channel.SetVelocityRevPerSec(revPerSec);
+        return $"Motor '{instanceId}' target set to {revPerSec:0.###} rev/s " +
+               $"(ramp {channel.AccelerationRevPerSec2:0.#} rev/s^2).";
+    }
+
+    public string EnableMotor(string instanceId, bool enabled)
+    {
+        var run = RequireRun();
+        run.Stepper(instanceId).Enable(enabled);
+        return $"Motor '{instanceId}' {(enabled ? "enabled" : "disabled")}.";
+    }
+
+    public string AddEndstop(string jointName, double triggerPosition, int debounceTicks = 3)
+    {
+        _endstopSpecs.RemoveAll(s => s.JointName == jointName);
+        _endstopSpecs.Add(new EndstopSpec(jointName, triggerPosition, debounceTicks));
+        if (_run is not null)
+            _endstops[jointName] = _run.Mcu.AddEndstop(jointName, triggerPosition, debounceTicks);
+        return $"Endstop on joint '{jointName}' triggers at {triggerPosition:0.####} " +
+               $"(debounce {debounceTicks} ticks){(_run is null ? "; takes effect next run" : "")}.";
+    }
+
+    public string ReadEndstop(string jointName)
+    {
+        var run = RequireRun();
+        if (!_endstops.TryGetValue(jointName, out var endstop))
+            throw new KeyNotFoundException($"No endstop on joint '{jointName}' — add one first (add_endstop).");
+        return $"Endstop '{jointName}': {(endstop.Pressed ? "PRESSED" : "open")} " +
+               $"(joint at {run.Simulator.GetJointPos(jointName):0.####}, trigger {endstop.TriggerPosition:0.####}).";
+    }
+
+    public string GetRunStatus()
+    {
+        RequireRun();
+        return BuildStatusText();
+    }
+
+    public string StopRun()
+    {
+        if (_run is null)
+            return "No run active.";
+        var time = _run.Simulator.Time;
+        _run.Dispose();
+        _run = null;
+        _endstops.Clear();
+        return $"Run stopped at t={time:0.###} s.";
+    }
+
+    private MachineSimulation RequireRun() =>
+        _run ?? throw new InvalidOperationException("No run active — call start_run first.");
+
+    private IEnumerable<string> WiredSteppers() =>
+        _machine.Wiring.Where(w => w.Signal == "step")
+            .Select(w => w.Component)
+            .Distinct();
+
+    private string BuildStatusText()
+    {
+        var run = _run!;
+        var lines = new List<string> { $"t = {run.Simulator.Time:0.###} s" };
+
+        foreach (var instanceId in WiredSteppers())
+        {
+            try
+            {
+                var channel = run.Stepper(instanceId);
+                lines.Add(
+                    $"{instanceId}{(channel.IsEnabled ? "" : " (disabled)")}: " +
+                    $"commanded {channel.CommandedAngleRev:0.####} rev / actual {channel.RotorAngleRev:0.####} rev, " +
+                    $"velocity {channel.RotorVelocityRevPerSec:0.###} rev/s (target {channel.TargetVelocityRevPerSec:0.###}), " +
+                    $"missed steps {channel.MissedSteps}{(channel.IsStalled ? ", STALLED" : "")}");
+            }
+            catch (KeyNotFoundException)
+            {
+                // Wired to "step" but not a stepper in the catalog — skip.
+            }
+        }
+
+        foreach (var (joint, endstop) in _endstops)
+            lines.Add($"endstop {joint}: {(endstop.Pressed ? "PRESSED" : "open")}");
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private sealed record EndstopSpec(string JointName, double TriggerPosition, int DebounceTicks);
+
+    public void Dispose() => _run?.Dispose();
+}

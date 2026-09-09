@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1",
+  "name": "empty_machine",
+  "description": "A bare 2020 beam to build on — the starting point for snapped assembly.",
+  "parts": [
+    { "id": "beam", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } }
+  ]
+}

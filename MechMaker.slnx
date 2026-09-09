@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/MechMaker.Core.Tests/MechMaker.Core.Tests.csproj" />
     <Project Path="tests/MechMaker.Engine.Tests/MechMaker.Engine.Tests.csproj" />
+    <Project Path="tests/MechMaker.Server.Tests/MechMaker.Server.Tests.csproj" />
   </Folder>
 </Solution>

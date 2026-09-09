@@ -12,6 +12,17 @@ public sealed record Pose
 
     public Quat Rotation => Quat.FromEulerXyz(ToRadians(RotationEulerDeg));
 
+    /// <summary>Converts a world transform into the authored pose format.</summary>
+    public static Pose FromTransform(Transform transform)
+    {
+        var euler = transform.Rotation.ToEulerXyz();
+        return new Pose
+        {
+            Position = transform.Position,
+            RotationEulerDeg = euler * (180.0 / Math.PI)
+        };
+    }
+
     private static Vec3 ToRadians(Vec3 deg) => new(
         deg.X * Math.PI / 180.0,
         deg.Y * Math.PI / 180.0,

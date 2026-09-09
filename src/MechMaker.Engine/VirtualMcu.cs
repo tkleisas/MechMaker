@@ -94,6 +94,10 @@ public sealed class StepperChannel
     /// (a stalled rotor only jiggles — allow some residual oscillation).</summary>
     public bool IsStalled => MissedSteps > 0 && Math.Abs(RotorVelocityRevPerSec) < 0.5;
 
+    /// <summary>Whether the channel is energized (a disabled rotor is dragged by its
+    /// load — that is back-driving, not missed steps).</summary>
+    public bool IsEnabled => _enabled;
+
     public double CommandedVelocityRevPerSec { get; private set; }
 
     /// <summary>Current velocity target; the channel ramps toward it at AccelerationRevPerSec2.</summary>
@@ -148,10 +152,15 @@ public sealed class StepperChannel
         sim.SetCtrlByIndex(_actuatorId, torque);
 
         // 3. Missed-step bookkeeping: lag beyond 1.5 full steps means lost steps.
-        var lagSteps = Math.Abs(CommandedAngleRev - RotorAngleRev) / _spec.FullStepRev;
-        var missed = Math.Max(0, (int)Math.Round(lagSteps) - 1);
-        if (missed > MissedSteps)
-            MissedSteps = missed;
+        //    Only meaningful while energized — a disabled rotor is back-driven by
+        //    its load (belts, gravity) and can't "miss" anything.
+        if (_enabled)
+        {
+            var lagSteps = Math.Abs(CommandedAngleRev - RotorAngleRev) / _spec.FullStepRev;
+            var missed = Math.Max(0, (int)Math.Round(lagSteps) - 1);
+            if (missed > MissedSteps)
+                MissedSteps = missed;
+        }
     }
 }
 

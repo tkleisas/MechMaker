@@ -1,0 +1,252 @@
+using System.ComponentModel;
+using MechMaker.Core;
+using MechMaker.Core.Validation;
+using MechMaker.Engine;
+using MechMaker.Engine.Scripting;
+using ModelContextProtocol.Server;
+
+namespace MechMaker.Server;
+
+/// <summary>
+/// The MCP tool surface: an LLM agent assembles machines from the part catalog,
+/// wires them to the virtual board, validates, compiles MJCF, and runs the
+/// physics closed loop (drive motors, watch endstops, catch stalls).
+/// All tools operate on the single session machine in <see cref="McpWorkspace"/>.
+/// Every tool body goes through one gate because the MCP layer dispatches
+/// concurrent calls and the workspace state is not thread-safe.
+/// </summary>
+[McpServerToolType]
+public static class MachineTools
+{
+    private static McpWorkspace W => McpWorkspace.Instance;
+    private static readonly object Gate = new();
+
+    private static T Locked<T>(Func<T> tool)
+    {
+        lock (Gate)
+            return tool();
+    }
+
+    // ---------- catalog ----------
+
+    [McpServerTool(Name = "list_catalog_parts")]
+    [Description("List all parts available in the MechMaker part catalog with their connectors, " +
+                 "motor specs, and transmission flags. Call this first to see what you can build with.")]
+    public static string ListCatalogParts() => Locked(() =>
+    {
+        var lines = W.Catalog.All
+            .OrderBy(p => p.Id)
+            .Select(p =>
+            {
+                var connectors = p.Connectors.Count == 0
+                    ? "no connectors"
+                    : string.Join(", ", p.Connectors.Select(c => $"{c.Name}:{c.Type}"));
+                var motor = p.Motor is null ? "" : $" | motor: {p.Motor.Kind} {p.Motor.HoldingTorqueNm} N*m";
+                var transmission = p.IsTransmissionElement ? " | transmission element" : "";
+                return $"{p.Id} — {connectors}{motor}{transmission}";
+            });
+        return string.Join(Environment.NewLine, lines);
+    });
+
+    [McpServerTool(Name = "get_part_info")]
+    [Description("Full JSON definition of one catalog part (bodies, shapes, connectors, motor specs).")]
+    public static string GetPartInfo(
+        [Description("Catalog part id, e.g. 'nema17_stepper'")] string catalogId)
+        => Locked(() => CoreJson.Serialize(W.Catalog.Get(catalogId)));
+
+    // ---------- machine file ----------
+
+    [McpServerTool(Name = "new_machine")]
+    [Description("Start building a new, empty machine, replacing whatever is in the session.")]
+    public static string NewMachine([Description("Machine name")] string name)
+        => Locked(() => W.NewMachine(name));
+
+    [McpServerTool(Name = "open_machine")]
+    [Description("Load a machine.json file into the session, replacing the current machine.")]
+    public static string OpenMachine([Description("Path to machine.json")] string path)
+        => Locked(() => W.OpenMachine(path));
+
+    [McpServerTool(Name = "save_machine")]
+    [Description("Save the session machine to a machine.json file. Omit the path to overwrite the file last opened.")]
+    public static string SaveMachine([Description("Destination path (optional)")] string? path = null)
+        => Locked(() => W.SaveMachine(path));
+
+    [McpServerTool(Name = "get_machine_json")]
+    [Description("The current session machine as machine.json (parts, connections, boards, wiring).")]
+    public static string GetMachineJson() => Locked(() => CoreJson.Serialize(W.Machine));
+
+    // ---------- parts ----------
+
+    [McpServerTool(Name = "add_part")]
+    [Description("Place a catalog part into the machine. Positions are metres; omit x/y/z to " +
+                 "auto-stack the part above everything already placed. Returns the instance id.")]
+    public static string AddPart(
+        [Description("Catalog part id, e.g. 'beam_2020_400'")] string catalogId,
+        [Description("Instance id for the placed part (optional; auto-generated if omitted)")] string? instanceId = null,
+        [Description("X position in metres")] double? x = null,
+        [Description("Y position in metres")] double? y = null,
+        [Description("Z position in metres")] double? z = null,
+        [Description("Rotation around X, degrees")] double rx = 0,
+        [Description("Rotation around Y, degrees")] double ry = 0,
+        [Description("Rotation around Z, degrees")] double rz = 0)
+        => Locked(() => W.AddPart(catalogId, instanceId, x, y, z, rx, ry, rz));
+
+    [McpServerTool(Name = "update_part_pose")]
+    [Description("Set the pose of a placed part. Positions in metres, rotations in degrees.")]
+    public static string UpdatePartPose(
+        [Description("Part instance id")] string instanceId,
+        double x, double y, double z,
+        [Description("Rotation around X, degrees")] double rx = 0,
+        [Description("Rotation around Y, degrees")] double ry = 0,
+        [Description("Rotation around Z, degrees")] double rz = 0)
+        => Locked(() => W.UpdatePartPose(instanceId, x, y, z, rx, ry, rz));
+
+    [McpServerTool(Name = "delete_part")]
+    [Description("Remove a placed part, including its connections and wiring.")]
+    public static string DeletePart([Description("Part instance id")] string instanceId)
+        => Locked(() => W.DeletePart(instanceId));
+
+    // ---------- connections ----------
+
+    [McpServerTool(Name = "add_connection")]
+    [Description("Mate two connectors of two placed parts (e.g. mount a stepper onto a mount " +
+                 "plate, clamp a carriage onto a belt). Use list_catalog_parts / get_part_info " +
+                 "to find connector names. Connection compatibility is checked by validate_machine.")]
+    public static string AddConnection(
+        [Description("First part instance id")] string partA,
+        [Description("Connector name on the first part")] string connectorA,
+        [Description("Second part instance id")] string partB,
+        [Description("Connector name on the second part")] string connectorB)
+        => Locked(() => W.AddConnection(partA, connectorA, partB, connectorB));
+
+    [McpServerTool(Name = "delete_connection")]
+    [Description("Remove a connection by its id (ids are returned by add_connection and appear in diagnostics).")]
+    public static string DeleteConnection([Description("Connection id, e.g. 'c1'")] string connectionId)
+        => Locked(() => W.DeleteConnection(connectionId));
+
+    [McpServerTool(Name = "list_connectors")]
+    [Description("Connectors of a placed part instance (name:type), so you can pick mates for connections.")]
+    public static string ListConnectors([Description("Part instance id")] string instanceId)
+        => Locked(() => string.Join(", ", W.ConnectorsOf(instanceId).Select(c => $"{c.Name}:{c.Type}")));
+
+    // ---------- boards & wiring ----------
+
+    [McpServerTool(Name = "add_board")]
+    [Description("Add a simulated control board to the machine.")]
+    public static string AddBoard(
+        [Description("Board id, e.g. 'main_board'")] string boardId,
+        [Description("Board type (default 'skr-pico')")] string type = "skr-pico")
+        => Locked(() => W.AddBoard(boardId, type));
+
+    [McpServerTool(Name = "wire")]
+    [Description("Wire a component signal to a board pin. A stepper motor needs a 'step' signal " +
+                 "to get a simulated motor channel (typical signals: step, dir, en, endstop).")]
+    public static string Wire(
+        [Description("Part instance id, e.g. the motor")] string component,
+        [Description("Signal name, e.g. 'step'")] string signal,
+        [Description("Board id")] string board,
+        [Description("Pin name on the board, e.g. 'stepper_x'")] string pin)
+        => Locked(() => W.Wire(component, signal, board, pin));
+
+    // ---------- validation & compilation ----------
+
+    [McpServerTool(Name = "validate_machine")]
+    [Description("Validate the machine: unknown parts/connector, duplicate ids, incompatible mates, " +
+                 "unwired steppers, disconnected islands, belt sanity. Returns mmNNN diagnostics or OK.")]
+    public static string ValidateMachine() => Locked(() =>
+    {
+        var report = W.Validate();
+        return report.Diagnostics.Count == 0 ? "OK" : report.ToString();
+    });
+
+    [McpServerTool(Name = "compile_mjcf")]
+    [Description("Compile the machine to a MuJoCo MJCF model (what the physics engine runs). " +
+                 "Fails with diagnostics if the machine has validation errors.")]
+    public static string CompileMjcf(
+        [Description("Write the XML to this file instead of returning it")] string? outputPath = null)
+        => Locked(() =>
+        {
+            var (mjcf, report) = W.Compile();
+            if (outputPath is not null)
+            {
+                var full = Path.GetFullPath(outputPath);
+                File.WriteAllText(full, mjcf);
+                return $"Compiled '{W.Machine.Name}' -> '{full}'" +
+                       (report.Diagnostics.Count == 0 ? "" : $"\n{report}");
+            }
+            return mjcf + (report.Diagnostics.Count == 0 ? "" : $"\n{report}");
+        });
+
+    // ---------- simulation ----------
+
+    [McpServerTool(Name = "start_run")]
+    [Description("Compile the machine and start a live physics run with the virtual MCU " +
+                 "(a stepper channel for every wired 'step' signal, 8 kHz deterministic loop). " +
+                 "Channels start disabled — enable and command each motor you want to drive " +
+                 "(enable_motor + set_motor_velocity). Fails with diagnostics if the machine does not compile.")]
+    public static string StartRun([Description("Microsteps per full step (default 16)")] int microsteps = 16)
+        => Locked(() => W.StartRun(microsteps));
+
+    [McpServerTool(Name = "run_for")]
+    [Description("Advance the live simulation, then report motor states and endstops.")]
+    public static string RunFor([Description("Simulated seconds to advance (0.001–10)")] double seconds)
+        => Locked(() => W.RunFor(seconds));
+
+    [McpServerTool(Name = "set_motor_velocity")]
+    [Description("Command a wired stepper's shaft velocity in rev/s. The channel ramps at its " +
+                 "acceleration limit like real firmware; commanding full speed instantly stalls the motor.")]
+    public static string SetMotorVelocity(
+        [Description("Motor part instance id")] string instanceId,
+        [Description("Target velocity in revolutions per second")] double revPerSec)
+        => Locked(() => W.SetMotorVelocity(instanceId, revPerSec));
+
+    [McpServerTool(Name = "enable_motor")]
+    [Description("Enable or disable a wired stepper (disabled = no torque, like de-energized coils).")]
+    public static string EnableMotor(
+        [Description("Motor part instance id")] string instanceId,
+        [Description("True to energize, false to release")] bool enabled)
+        => Locked(() => W.EnableMotor(instanceId, enabled));
+
+    [McpServerTool(Name = "add_endstop")]
+    [Description("Add a limit switch watching a joint position (pressed at or below the trigger " +
+                 "position). Active immediately if a run is live, otherwise on the next run.")]
+    public static string AddEndstop(
+        [Description("Joint name, e.g. the carriage slide 'j_my_carriage'")] string jointName,
+        [Description("Trigger position in the joint's coordinate (metres)")] double triggerPosition,
+        [Description("Debounce ticks (default 3)")] int debounceTicks = 3)
+        => Locked(() => W.AddEndstop(jointName, triggerPosition, debounceTicks));
+
+    [McpServerTool(Name = "read_endstop")]
+    [Description("Read a limit switch's debounced state and the joint position it watches.")]
+    public static string ReadEndstop([Description("Joint name the endstop watches")] string jointName)
+        => Locked(() => W.ReadEndstop(jointName));
+
+    [McpServerTool(Name = "get_run_status")]
+    [Description("Current live-run state: time, per-motor commanded/actual angle, missed steps, " +
+                 "stalls, endstop states.")]
+    public static string GetRunStatus() => Locked(() => W.GetRunStatus());
+
+    [McpServerTool(Name = "stop_run")]
+    [Description("Stop the live simulation and discard it (machine edits apply to the next run).")]
+    public static string StopRun() => Locked(() => W.StopRun());
+
+    // ---------- Lua scenarios ----------
+
+    [McpServerTool(Name = "get_scenario_api")]
+    [Description("Documents the `sim` API passed to `run(sim)` in MechMaker Lua scenarios " +
+                 "(deterministic scripted simulations: drive motors, watch endstops, detect stalls).")]
+    public static string GetScenarioApi() => LuaScenario.ApiDoc;
+
+    [McpServerTool(Name = "run_scenario_source")]
+    [Description("Run a Lua scenario against the session machine. The script must define " +
+                 "`function run(sim) ... end`; call sim.run(seconds) to advance, sim.enable / " +
+                 "sim.velocity to drive motors, sim.endstop to sense. Returns the print log, " +
+                 "the `result` table as JSON, and sim time. Call get_scenario_api for the full API.")]
+    public static string RunScenarioSource([Description("Lua source of the scenario")] string source)
+        => Locked(() => W.RunScenarioSource(source));
+
+    [McpServerTool(Name = "run_scenario")]
+    [Description("Run a Lua scenario file (.lua) against the session machine — see get_scenario_api.")]
+    public static string RunScenario([Description("Path to the .lua scenario file")] string path)
+        => Locked(() => W.RunScenarioFile(path));
+}

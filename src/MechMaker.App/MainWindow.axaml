@@ -2,36 +2,75 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:MechMaker.App"
         x:Class="MechMaker.App.MainWindow"
-        Title="MechMaker" Width="1280" Height="800">
-  <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="260,*,320">
+        Title="MechMaker" Width="1360" Height="840">
+  <Grid RowDefinitions="Auto,*,Auto,Auto" ColumnDefinitions="260,*,340">
 
     <!-- Toolbar -->
     <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="6" Spacing="8">
       <Button x:Name="OpenButton" Content="Open…" Click="OnOpen" />
       <Button x:Name="SaveButton" Content="Save" Click="OnSave" />
       <Button x:Name="RunButton" Content="▶ Run" Click="OnRunToggle" />
+      <TextBlock Text="rev/s" VerticalAlignment="Center" Margin="10,0,2,0" Foreground="Gray" />
+      <TextBox x:Name="RunSpeed" Width="60" Text="1.0" />
+      <Button x:Name="ScriptButton" Content="Run Script…" Click="OnRunScript" />
+      <Button x:Name="ClearScriptButton" Content="Clear" Click="OnClearScriptOutput" />
       <TextBlock x:Name="ModeText" VerticalAlignment="Center" Foreground="Gray" />
+      <Button HorizontalAlignment="Right" Click="OnGridSettings" Margin="20,0,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Ellipse Width="10" Height="10" Fill="#4477AA" />
+          <TextBlock Text="Grid…" />
+        </StackPanel>
+      </Button>
+      <Popup x:Name="GridPopup" PlacementMode="Bottom" IsLightDismissEnabled="True">
+        <Border Background="#1E1E22" BorderBrush="#555" BorderThickness="1" CornerRadius="6"
+                Padding="12" Width="260">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Reference grid" FontWeight="Bold" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Color" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ColorPicker x:Name="GridLineColor" Grid.Row="0" Grid.Column="1"
+                           Color="#3B3D44" ColorChanged="OnGridStyleChanged" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Thickness" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Slider x:Name="GridThickness" Grid.Row="1" Grid.Column="1" Minimum="0.2" Maximum="3"
+                      Value="0.8" TickFrequency="0.2" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Spacing" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ComboBox x:Name="GridSpacing" Grid.Row="2" Grid.Column="1" SelectedIndex="1">
+                <ComboBoxItem Content="25 mm" Tag="0.025" />
+                <ComboBoxItem Content="50 mm" Tag="0.05" />
+                <ComboBoxItem Content="100 mm" Tag="0.1" />
+                <ComboBoxItem Content="250 mm" Tag="0.25" />
+              </ComboBox>
+            </Grid>
+          </StackPanel>
+        </Border>
+      </Popup>
     </StackPanel>
 
-    <!-- Left: catalog -->
+    <!-- Left: catalog + placement -->
     <Border Grid.Row="1" Grid.Column="0" BorderBrush="#444" BorderThickness="0,0,1,0" Padding="6">
-      <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Catalog" FontWeight="Bold" Margin="2,0,0,6" />
-        <ListBox x:Name="CatalogList" />
-      </DockPanel>
+      <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+        <TextBlock Grid.Row="0" Text="Catalog" FontWeight="Bold" Margin="2,0,0,6" />
+        <ListBox x:Name="CatalogList" Grid.Row="1" />
+        <TextBlock Grid.Row="2" Text="New part connector (for snap)" Margin="2,8,0,2" Foreground="Gray" />
+        <ComboBox x:Name="SnapConnector" Grid.Row="3" Margin="2" />
+        <Button x:Name="SnapButton" Grid.Row="4" Content="Snap onto target connector →"
+                Click="OnSnapAdd" Margin="2,6" />
+        <TextBlock Grid.Row="5" Text="Target = connector A below" Margin="2" Foreground="#777"
+                   TextWrapping="Wrap" />
+      </Grid>
     </Border>
 
     <!-- Center: 3D viewport -->
     <local:ViewportControl x:Name="Viewport" Grid.Row="1" Grid.Column="1" />
 
-    <!-- Right: machine + properties + connections -->
+    <!-- Right: machine + properties + connections + wiring -->
     <Border Grid.Row="1" Grid.Column="2" BorderBrush="#444" BorderThickness="1,0,0,0" Padding="6">
-      <Grid RowDefinitions="Auto,140,Auto,190,Auto,120,Auto,*">
+      <Grid RowDefinitions="Auto,120,Auto,Auto,Auto,110,Auto,Auto,Auto,120,*">
         <TextBlock Grid.Row="0" Text="Machine" FontWeight="Bold" Margin="2,0" />
         <ListBox x:Name="MachineList" Grid.Row="1" Margin="0,4" />
 
         <TextBlock Grid.Row="2" Text="Part properties" FontWeight="Bold" Margin="2,8,0,0" />
-        <Grid Grid.Row="3" Margin="0,4" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+        <Grid Grid.Row="3" Margin="0,4" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
           <TextBlock Grid.Row="0" Grid.Column="0" Text="id" Margin="2" />
           <TextBox x:Name="PartId" Grid.Row="0" Grid.Column="1" Margin="2" IsEnabled="False" />
           <TextBlock Grid.Row="1" Grid.Column="0" Text="pos X" Margin="2" />
@@ -46,6 +85,8 @@
           <TextBox x:Name="RotY" Grid.Row="5" Grid.Column="1" Margin="2" />
           <TextBlock Grid.Row="6" Grid.Column="0" Text="rot Z°" Margin="2" />
           <TextBox x:Name="RotZ" Grid.Row="6" Grid.Column="1" Margin="2" />
+          <Button x:Name="ApplyPoseButton" Grid.Row="7" Grid.ColumnSpan="2" Content="Apply pose"
+                  Click="OnApplyPose" Margin="2,4" />
         </Grid>
 
         <TextBlock Grid.Row="4" Text="Connections" FontWeight="Bold" Margin="2,8,0,0" />
@@ -59,6 +100,20 @@
           <Button x:Name="DeleteConnectionButton" Grid.Row="2" Grid.ColumnSpan="2"
                   Content="Delete selected connection" Click="OnDeleteConnection" Margin="2" />
         </Grid>
+
+        <TextBlock Grid.Row="7" Text="Boards &amp; wiring" FontWeight="Bold" Margin="2,10,0,0" />
+        <Grid Grid.Row="8" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4">
+          <ComboBox x:Name="BoardList" Grid.Row="0" Grid.Column="0" Margin="2" />
+          <TextBox x:Name="BoardId" Grid.Row="0" Grid.Column="1" Margin="2" PlaceholderText="new board id" />
+          <ComboBox x:Name="WireComponent" Grid.Row="1" Grid.Column="0" Margin="2,4" />
+          <TextBox x:Name="WireSignal" Grid.Row="1" Grid.Column="1" Margin="2,4" PlaceholderText="signal (step…)" />
+          <TextBox x:Name="WirePin" Grid.Row="2" Grid.Column="0" Margin="2" PlaceholderText="pin (P2_2…)" />
+          <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="2">
+            <Button Content="Wire" Click="OnWire" Margin="0,0,4,0" />
+            <Button Content="Add board" Click="OnAddBoard" />
+          </StackPanel>
+        </Grid>
+        <ListBox x:Name="WireList" Grid.Row="9" Margin="0,4" />
       </Grid>
     </Border>
 
@@ -68,8 +123,17 @@
         <TextBlock x:Name="StatusText" Foreground="LightGray" />
         <Button x:Name="AddPartButton" Content="Add selected part" Click="OnAddPart" />
         <Button x:Name="DeletePartButton" Content="Delete selected part" Click="OnDeletePart" />
-        <Button x:Name="SaveMachineButton" Content="Save machine" Click="OnSave" />
       </StackPanel>
+    </Border>
+
+    <!-- Script output -->
+    <Border Grid.Row="3" Grid.ColumnSpan="3" Background="#18181B" Padding="6" IsVisible="False"
+            x:Name="ScriptOutputPanel" MaxHeight="220">
+      <TextBox x:Name="ScriptOutput" IsReadOnly="True" FontFamily="Consolas, monospace"
+               Background="Transparent" Foreground="#C8E1C8" BorderThickness="0"
+               TextWrapping="NoWrap" AcceptsReturn="True" />
     </Border>
   </Grid>
 </Window>
+
+
