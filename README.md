@@ -112,8 +112,9 @@ The catalog directory is found by walking up from the working directory (or set
 
 ```
 catalog/                 part definitions (JSON)
-examples/                example machines
+examples/                example machines (incl. linear_axis_agent.json, assembled end-to-end via MCP tools)
 scripts/                 Lua simulation scenarios
+tools/                   mcp_e2e.ps1 — self-checking MCP stdio end-to-end test
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
 src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU

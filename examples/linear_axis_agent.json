@@ -1,0 +1,258 @@
+{
+  "schema_version": "0.1",
+  "name": "agent_axis",
+  "parts": [
+    {
+      "id": "beam",
+      "part": "beam_2020_400",
+      "pose": {}
+    },
+    {
+      "id": "rail",
+      "part": "mgn12_rail_400",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "carriage",
+      "part": "mgn12_carriage",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.1
+        ]
+      }
+    },
+    {
+      "id": "plate_left",
+      "part": "motor_mount_plate_2020",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.15000000000000002
+        ]
+      }
+    },
+    {
+      "id": "plate_right",
+      "part": "motor_mount_plate_2020",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.2
+        ]
+      }
+    },
+    {
+      "id": "motor_left",
+      "part": "nema17_stepper",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.25
+        ]
+      }
+    },
+    {
+      "id": "motor_right",
+      "part": "nema17_stepper",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.30000000000000004
+        ]
+      }
+    },
+    {
+      "id": "pulley_left",
+      "part": "gt2_pulley_20t",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.35000000000000003
+        ]
+      }
+    },
+    {
+      "id": "pulley_right",
+      "part": "gt2_pulley_20t",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.4
+        ]
+      }
+    },
+    {
+      "id": "belt",
+      "part": "gt2_belt_400",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.45
+        ]
+      }
+    },
+    {
+      "id": "endstop",
+      "part": "endstop_microswitch",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0.5
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "part_a": "beam",
+      "connector_a": "top_mid",
+      "part_b": "rail",
+      "connector_b": "mount"
+    },
+    {
+      "id": "c2",
+      "part_a": "rail",
+      "connector_a": "carriage_top",
+      "part_b": "carriage",
+      "connector_b": "rail_side"
+    },
+    {
+      "id": "c3",
+      "part_a": "beam",
+      "connector_a": "end_a",
+      "part_b": "plate_left",
+      "connector_b": "tslot"
+    },
+    {
+      "id": "c4",
+      "part_a": "plate_left",
+      "connector_a": "motor_face",
+      "part_b": "motor_left",
+      "connector_b": "mount"
+    },
+    {
+      "id": "c5",
+      "part_a": "beam",
+      "connector_a": "end_b",
+      "part_b": "plate_right",
+      "connector_b": "tslot"
+    },
+    {
+      "id": "c6",
+      "part_a": "plate_right",
+      "connector_a": "motor_face",
+      "part_b": "motor_right",
+      "connector_b": "mount"
+    },
+    {
+      "id": "c7",
+      "part_a": "motor_left",
+      "connector_a": "shaft",
+      "part_b": "pulley_left",
+      "connector_b": "bore"
+    },
+    {
+      "id": "c8",
+      "part_a": "motor_right",
+      "connector_a": "shaft",
+      "part_b": "pulley_right",
+      "connector_b": "bore"
+    },
+    {
+      "id": "c9",
+      "part_a": "belt",
+      "connector_a": "end_a",
+      "part_b": "pulley_left",
+      "connector_b": "belt"
+    },
+    {
+      "id": "c10",
+      "part_a": "belt",
+      "connector_a": "end_b",
+      "part_b": "pulley_right",
+      "connector_b": "belt"
+    },
+    {
+      "id": "c11",
+      "part_a": "carriage",
+      "connector_a": "belt_clamp",
+      "part_b": "belt",
+      "connector_b": "clamp"
+    },
+    {
+      "id": "c12",
+      "part_a": "carriage",
+      "connector_a": "top",
+      "part_b": "endstop",
+      "connector_b": "mount"
+    }
+  ],
+  "boards": [
+    {
+      "id": "main_board",
+      "type": "skr-pico",
+      "pins": {}
+    }
+  ],
+  "wiring": [
+    {
+      "component": "motor_left",
+      "signal": "step",
+      "board": "main_board",
+      "pin": "P2_2"
+    },
+    {
+      "component": "motor_left",
+      "signal": "dir",
+      "board": "main_board",
+      "pin": "P2_6"
+    },
+    {
+      "component": "motor_left",
+      "signal": "enable",
+      "board": "main_board",
+      "pin": "P2_1"
+    },
+    {
+      "component": "motor_right",
+      "signal": "step",
+      "board": "main_board",
+      "pin": "P6_2"
+    },
+    {
+      "component": "motor_right",
+      "signal": "dir",
+      "board": "main_board",
+      "pin": "P6_6"
+    },
+    {
+      "component": "motor_right",
+      "signal": "enable",
+      "board": "main_board",
+      "pin": "P6_1"
+    },
+    {
+      "component": "endstop",
+      "signal": "endstop",
+      "board": "main_board",
+      "pin": "P1_28"
+    }
+  ]
+}
