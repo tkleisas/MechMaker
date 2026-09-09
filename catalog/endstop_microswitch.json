@@ -1,0 +1,18 @@
+{
+  "id": "endstop_microswitch",
+  "name": "Microswitch endstop",
+  "category": "sensor",
+  "description": "Mechanical limit switch on a small PCB. Mounts with a single screw; wire its 'endstop' signal to a board pin.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.005,
+      "shapes": [
+        { "kind": "box", "extents": [0.02, 0.006, 0.01], "rgba": "0.1 0.35 0.1 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.005], "rot": [180, 0, 0] } }
+  ]
+}

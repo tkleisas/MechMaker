@@ -1,0 +1,22 @@
+{
+  "id": "beam_2020_400",
+  "name": "2020 T-slot extrusion, 400 mm",
+  "category": "structure",
+  "description": "20x20 mm aluminium extrusion. Connectors point outward at both ends (+Z authored outward).",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.32,
+      "shapes": [
+        { "kind": "box", "extents": [0.4, 0.02, 0.02], "rgba": "0.75 0.75 0.78 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "end_a", "type": "tslot_2020", "pose": { "pos": [-0.2, 0, 0], "rot": [0, -90, 0] } },
+    { "name": "end_b", "type": "tslot_2020", "pose": { "pos": [0.2, 0, 0], "rot": [0, 90, 0] } },
+    { "name": "top_mid", "type": "tslot_2020", "pose": { "pos": [0, 0, 0.01] } },
+    { "name": "top_a", "type": "tslot_2020", "pose": { "pos": [-0.1, 0, 0.01] } },
+    { "name": "top_b", "type": "tslot_2020", "pose": { "pos": [0.1, 0, 0.01] } }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mechmaker.dev/schemas/machine-0.1.json",
+  "title": "MechMaker machine definition",
+  "description": "A LEGO-style electromechanical assembly: placed parts from the catalog, their connections, and the electrical wiring to simulated boards. Units: meters, kilograms, seconds. Connector +Z axes are authored pointing outward from the part.",
+  "type": "object",
+  "required": ["name", "parts"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "0.1" },
+    "name": { "type": "string" },
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "part"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$",
+            "description": "Unique instance id (XML-name-safe; becomes the MuJoCo body name)."
+          },
+          "part": { "type": "string", "description": "Catalog part id." },
+          "pose": { "$ref": "#/definitions/pose" }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "part_a", "connector_a", "part_b", "connector_b"],
+        "properties": {
+          "id": { "type": "string" },
+          "part_a": { "type": "string" },
+          "connector_a": { "type": "string" },
+          "part_b": { "type": "string" },
+          "connector_b": { "type": "string" }
+        }
+      }
+    },
+    "boards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "description": "Board model, e.g. skr-pico." },
+          "pins": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Logical name -> pin label."
+          }
+        }
+      }
+    },
+    "wiring": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "signal", "board", "pin"],
+        "properties": {
+          "component": { "type": "string", "description": "Part instance id." },
+          "signal": {
+            "type": "string",
+            "enum": ["step", "dir", "enable", "endstop", "pwm", "power"],
+            "description": "Logical signal name."
+          },
+          "board": { "type": "string" },
+          "pin": { "type": "string" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "vec3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "pose": {
+      "type": "object",
+      "properties": {
+        "pos": { "$ref": "#/definitions/vec3", "description": "Meters." },
+        "rot": {
+          "$ref": "#/definitions/vec3",
+          "description": "Extrinsic XYZ Euler angles in degrees."
+        }
+      }
+    }
+  }
+}

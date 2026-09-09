@@ -1,0 +1,20 @@
+{
+  "id": "corner_bracket_2020",
+  "name": "2020 corner bracket (clamp)",
+  "category": "structure",
+  "description": "L-shaped clamp joining two 2020 extrusions at a right angle. side_a mates a horizontal beam end, side_b a vertical one.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.012,
+      "shapes": [
+        { "kind": "box", "extents": [0.006, 0.04, 0.04], "relative_pose": { "pos": [0.003, 0, 0] }, "rgba": "0.35 0.35 0.4 1" },
+        { "kind": "box", "extents": [0.04, 0.04, 0.006], "relative_pose": { "pos": [0.02, 0, -0.017] }, "rgba": "0.35 0.35 0.4 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "side_a", "type": "tslot_2020", "pose": { "pos": [0, 0, 0], "rot": [0, -90, 0] } },
+    { "name": "side_b", "type": "tslot_2020", "pose": { "pos": [0.02, 0, -0.02], "rot": [180, 0, 0] } }
+  ]
+}

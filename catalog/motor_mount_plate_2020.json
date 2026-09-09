@@ -1,0 +1,19 @@
+{
+  "id": "motor_mount_plate_2020",
+  "name": "NEMA 17 mount plate for 2020",
+  "category": "structure",
+  "description": "Adapter plate: T-slot end on one face, NEMA 17 bolt pattern on the other.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.02,
+      "shapes": [
+        { "kind": "box", "extents": [0.0423, 0.0423, 0.004], "rgba": "0.45 0.45 0.5 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "tslot", "type": "tslot_2020", "pose": { "pos": [0, 0, -0.002], "rot": [180, 0, 0] } },
+    { "name": "motor_face", "type": "bolt_m3", "pose": { "pos": [0, 0, 0.002] } }
+  ]
+}

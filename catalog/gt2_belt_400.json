@@ -1,0 +1,24 @@
+{
+  "id": "gt2_belt_400",
+  "name": "GT2 belt loop, 400 mm",
+  "category": "transmission",
+  "description": "Closed GT2 belt loop. A transmission element: it is never rigidly mounted; it couples the two pulleys its ends connect to. Geometry is a schematic strap.",
+  "is_transmission_element": true,
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.02,
+      "shapes": [
+        { "kind": "box", "extents": [0.4, 0.007, 0.0012], "rgba": "0.15 0.15 0.17 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "end_a", "type": "belt_loop", "pose": { "pos": [-0.2, 0, 0] } },
+    { "name": "end_b", "type": "belt_loop", "pose": { "pos": [0.2, 0, 0] } },
+    { "name": "clamp", "type": "belt_clamp", "pose": { "pos": [0, 0, 0] } }
+  ],
+  "params": {
+    "length": 0.4
+  }
+}

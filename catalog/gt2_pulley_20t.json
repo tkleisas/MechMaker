@@ -1,0 +1,23 @@
+{
+  "id": "gt2_pulley_20t",
+  "name": "GT2 pulley, 20 teeth",
+  "category": "transmission",
+  "description": "GT2-2M 20T pulley, 9 mm wide, bore 5 mm. pitch_radius in meters is used by the compiler to compute belt ratios.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.02,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.0064, 0.009, 0], "rgba": "0.85 0.72 0.2 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "bore", "type": "bore_5mm", "pose": { "pos": [0, 0, 0], "rot": [180, 0, 0] } },
+    { "name": "belt", "type": "belt_loop", "pose": { "pos": [0.0064, 0, 0], "rot": [0, 90, 0] } }
+  ],
+  "params": {
+    "teeth": 20,
+    "pitch_radius": 0.006366
+  }
+}

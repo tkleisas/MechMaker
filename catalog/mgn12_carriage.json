@@ -1,0 +1,20 @@
+{
+  "id": "mgn12_carriage",
+  "name": "MGN12 carriage block",
+  "category": "linear_motion",
+  "description": "Standard carriage for MGN12 rails. Connector sits on its underside; slides along the rail's length axis.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.05,
+      "shapes": [
+        { "kind": "box", "extents": [0.027, 0.027, 0.013], "relative_pose": { "pos": [0, 0, 0.0065] }, "rgba": "0.6 0.6 0.66 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "rail_side", "type": "mgn12_carriage", "pose": { "pos": [0, 0, 0], "rot": [180, 0, 0] } },
+    { "name": "top", "type": "bolt_m3", "pose": { "pos": [0, 0, 0.013] } },
+    { "name": "belt_clamp", "type": "belt_clamp", "pose": { "pos": [0, -0.015, 0.0065], "rot": [0, 90, 0] } }
+  ]
+}

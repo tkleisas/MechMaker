@@ -1,0 +1,36 @@
+{
+  "id": "nema17_stepper",
+  "name": "NEMA 17 stepper motor",
+  "category": "motor",
+  "description": "42x42 mm hybrid stepper, 40 mm body, 5 mm shaft, 22 mm shaft length. Mount on its back face (M3 pattern, simplified to one connector).",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.3,
+      "shapes": [
+        { "kind": "box", "extents": [0.0423, 0.0423, 0.04], "rgba": "0.25 0.25 0.28 1" }
+      ]
+    },
+    {
+      "name": "rotor",
+      "parent_body": "root",
+      "relative_pose": { "pos": [0, 0, 0.02] },
+      "mass_kg": 0.06,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.0025, 0.022, 0], "relative_pose": { "pos": [0, 0, 0.011] }, "rgba": "0.8 0.8 0.82 1" }
+      ],
+      "actuated": "hinge"
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, -0.02], "rot": [180, 0, 0] } },
+    { "name": "shaft", "type": "shaft_5mm", "body": "rotor", "pose": { "pos": [0, 0, 0.022] } }
+  ],
+  "motor": {
+    "kind": "stepper",
+    "step_angle_deg": 1.8,
+    "holding_torque_nm": 0.4,
+    "rated_current_a": 1.7,
+    "max_speed_rps": 10
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "mgn12_rail_400",
+  "name": "MGN12 linear rail, 400 mm",
+  "category": "linear_motion",
+  "description": "12 mm linear guide rail. Mounts on a 2020 extrusion from below; accepts an MGN12 carriage on top. Slide axis is the rail length direction.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.6,
+      "shapes": [
+        { "kind": "box", "extents": [0.4, 0.012, 0.008], "rgba": "0.55 0.55 0.6 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "tslot_2020", "pose": { "pos": [0, 0, -0.004], "rot": [180, 0, 0] } },
+    { "name": "carriage_top", "type": "mgn12_rail", "pose": { "pos": [0, 0, 0.004] }, "axis": [1, 0, 0] }
+  ]
+}

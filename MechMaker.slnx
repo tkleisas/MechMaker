@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MechMaker.App/MechMaker.App.csproj" />
+    <Project Path="src/MechMaker.Cli/MechMaker.Cli.csproj" />
+    <Project Path="src/MechMaker.Core/MechMaker.Core.csproj" />
+    <Project Path="src/MechMaker.Engine/MechMaker.Engine.csproj" />
+    <Project Path="src/MechMaker.Server/MechMaker.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MechMaker.Core.Tests/MechMaker.Core.Tests.csproj" />
+    <Project Path="tests/MechMaker.Engine.Tests/MechMaker.Engine.Tests.csproj" />
+  </Folder>
+</Solution>
