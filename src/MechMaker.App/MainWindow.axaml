@@ -1,9 +1,75 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:local="clr-namespace:MechMaker.App"
         x:Class="MechMaker.App.MainWindow"
-        Title="MechMaker.App">
-    Welcome to Avalonia!
+        Title="MechMaker" Width="1280" Height="800">
+  <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="260,*,320">
+
+    <!-- Toolbar -->
+    <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="6" Spacing="8">
+      <Button x:Name="OpenButton" Content="Open…" Click="OnOpen" />
+      <Button x:Name="SaveButton" Content="Save" Click="OnSave" />
+      <Button x:Name="RunButton" Content="▶ Run" Click="OnRunToggle" />
+      <TextBlock x:Name="ModeText" VerticalAlignment="Center" Foreground="Gray" />
+    </StackPanel>
+
+    <!-- Left: catalog -->
+    <Border Grid.Row="1" Grid.Column="0" BorderBrush="#444" BorderThickness="0,0,1,0" Padding="6">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Catalog" FontWeight="Bold" Margin="2,0,0,6" />
+        <ListBox x:Name="CatalogList" />
+      </DockPanel>
+    </Border>
+
+    <!-- Center: 3D viewport -->
+    <local:ViewportControl x:Name="Viewport" Grid.Row="1" Grid.Column="1" />
+
+    <!-- Right: machine + properties + connections -->
+    <Border Grid.Row="1" Grid.Column="2" BorderBrush="#444" BorderThickness="1,0,0,0" Padding="6">
+      <Grid RowDefinitions="Auto,140,Auto,190,Auto,120,Auto,*">
+        <TextBlock Grid.Row="0" Text="Machine" FontWeight="Bold" Margin="2,0" />
+        <ListBox x:Name="MachineList" Grid.Row="1" Margin="0,4" />
+
+        <TextBlock Grid.Row="2" Text="Part properties" FontWeight="Bold" Margin="2,8,0,0" />
+        <Grid Grid.Row="3" Margin="0,4" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="id" Margin="2" />
+          <TextBox x:Name="PartId" Grid.Row="0" Grid.Column="1" Margin="2" IsEnabled="False" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="pos X" Margin="2" />
+          <TextBox x:Name="PosX" Grid.Row="1" Grid.Column="1" Margin="2" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="pos Y" Margin="2" />
+          <TextBox x:Name="PosY" Grid.Row="2" Grid.Column="1" Margin="2" />
+          <TextBlock Grid.Row="3" Grid.Column="0" Text="pos Z" Margin="2" />
+          <TextBox x:Name="PosZ" Grid.Row="3" Grid.Column="1" Margin="2" />
+          <TextBlock Grid.Row="4" Grid.Column="0" Text="rot X°" Margin="2" />
+          <TextBox x:Name="RotX" Grid.Row="4" Grid.Column="1" Margin="2" />
+          <TextBlock Grid.Row="5" Grid.Column="0" Text="rot Y°" Margin="2" />
+          <TextBox x:Name="RotY" Grid.Row="5" Grid.Column="1" Margin="2" />
+          <TextBlock Grid.Row="6" Grid.Column="0" Text="rot Z°" Margin="2" />
+          <TextBox x:Name="RotZ" Grid.Row="6" Grid.Column="1" Margin="2" />
+        </Grid>
+
+        <TextBlock Grid.Row="4" Text="Connections" FontWeight="Bold" Margin="2,8,0,0" />
+        <ListBox x:Name="ConnectionList" Grid.Row="5" Margin="0,4" />
+
+        <Grid Grid.Row="6" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4">
+          <ComboBox x:Name="ConnectorA" Grid.Row="0" Grid.Column="0" Margin="2" />
+          <ComboBox x:Name="ConnectorB" Grid.Row="0" Grid.Column="1" Margin="2" />
+          <Button x:Name="AddConnectionButton" Grid.Row="1" Grid.ColumnSpan="2"
+                  Content="Connect selected connectors" Click="OnAddConnection" Margin="2" />
+          <Button x:Name="DeleteConnectionButton" Grid.Row="2" Grid.ColumnSpan="2"
+                  Content="Delete selected connection" Click="OnDeleteConnection" Margin="2" />
+        </Grid>
+      </Grid>
+    </Border>
+
+    <!-- Status -->
+    <Border Grid.Row="2" Grid.ColumnSpan="3" Background="#222" Padding="6,4">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock x:Name="StatusText" Foreground="LightGray" />
+        <Button x:Name="AddPartButton" Content="Add selected part" Click="OnAddPart" />
+        <Button x:Name="DeletePartButton" Content="Delete selected part" Click="OnDeletePart" />
+        <Button x:Name="SaveMachineButton" Content="Save machine" Click="OnSave" />
+      </StackPanel>
+    </Border>
+  </Grid>
 </Window>

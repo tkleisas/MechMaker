@@ -217,6 +217,47 @@ public sealed unsafe class Simulator : IDisposable
         return report;
     }
 
+    // ---------- scene extraction (renderer input) ----------
+
+    /// <summary>Runs kinematics only (no dynamics) so geom world poses are current.</summary>
+    public void RefreshKinematics() => MuJoCo.mj_kinematics(_model, _data);
+
+    /// <summary>All visual geoms with world pose, size, and color.</summary>
+    public IReadOnlyList<SceneShape> GetScene()
+    {
+        var shapes = new List<SceneShape>((int)_model->ngeom);
+        for (var i = 0; i < _model->ngeom; i++)
+        {
+            var type = (mjtGeom)_model->geom_type[i];
+            if (type is not (mjtGeom.mjGEOM_BOX or mjtGeom.mjGEOM_CYLINDER))
+                continue;
+
+            shapes.Add(new SceneShape(
+                GeomName(i),
+                type == mjtGeom.mjGEOM_BOX ? SceneShapeKind.Box : SceneShapeKind.Cylinder,
+                _model->geom_size[i * 3],
+                _model->geom_size[i * 3 + 1],
+                _model->geom_size[i * 3 + 2],
+                _data->geom_xpos[i * 3],
+                _data->geom_xpos[i * 3 + 1],
+                _data->geom_xpos[i * 3 + 2],
+                _data->geom_xmat[i * 9],
+                _data->geom_xmat[i * 9 + 1],
+                _data->geom_xmat[i * 9 + 2],
+                _data->geom_xmat[i * 9 + 3],
+                _data->geom_xmat[i * 9 + 4],
+                _data->geom_xmat[i * 9 + 5],
+                _data->geom_xmat[i * 9 + 6],
+                _data->geom_xmat[i * 9 + 7],
+                _data->geom_xmat[i * 9 + 8],
+                _model->geom_rgba[i * 4],
+                _model->geom_rgba[i * 4 + 1],
+                _model->geom_rgba[i * 4 + 2],
+                _model->geom_rgba[i * 4 + 3]));
+        }
+        return shapes;
+    }
+
     // ---------- disposal ----------
 
     public void Dispose()
