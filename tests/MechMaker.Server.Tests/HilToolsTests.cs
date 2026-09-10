@@ -122,11 +122,11 @@ public class HilToolsTests : IDisposable
 
         // Settle at rest, then two commanded press/retract cycles (scripted taps).
         _w.RunFor(0.02);
-        _w.SetFingerPosition("finger", -0.008);
+        _w.SetFingerPosition("finger", -0.012);
         _w.RunFor(0.05);
         _w.SetFingerPosition("finger", 0.002);
         _w.RunFor(0.05);
-        _w.SetFingerPosition("finger", -0.008);
+        _w.SetFingerPosition("finger", -0.012);
         _w.RunFor(0.05);
 
         Assert.Contains("physics taps dispatched", _w.HilStatus());

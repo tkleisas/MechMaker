@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1",
   "name": "phone_test_rig",
-  "description": "The androidtester seed rig: an android_phone on a plate at the beam centre, and a touch_finger hanging under a plate on the side, arming over the phone with a horizontal arm. The tip hangs on an unactuated slide: gravity drops it onto the glass, and when it presses, the HIL bridge dispatches emulator taps at the contact point.",
+  "description": "The androidtester seed rig, minimal: an android_phone on a plate at the beam centre, and a touch_finger hanging under a plate on the side, arming over the phone with a horizontal arm. The tip hangs on a servo-driven slide (the press plunger): command it down (set_finger_position) and when it presses the glass the HIL bridge dispatches emulator taps at the contact point.",
   "parts": [
     { "id": "base", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } },
     { "id": "phone_plate", "part": "motor_mount_plate_2020", "pose": {} },

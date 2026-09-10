@@ -90,9 +90,13 @@ What works today:
   press −8 mm / retract +2 mm) physically taps the glass; each press dispatches an
   emulator tap at the contact point (one per press episode; hold for long-press
   timing). Servo-on-slide actuators take metre units (`min_pos_m`/`max_pos_m`).
-  Rig: `examples/phone_test_rig.json`; flagship scenario:
-  `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock → OCR-style home
-  assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
+  **The gantry moves the finger**: `examples/phone_gantry_rig.json` mounts the
+  finger on a belt-driven carriage (linear_axis mechanics) riding above the phone —
+  drive `motor_left` to reposition, tap again, and the contact point follows the
+  machine: two taps at different screen fractions, test-verified.
+  Rig: `examples/phone_test_rig.json` (minimal) + `phone_gantry_rig.json` (gantry);
+  flagship scenario: `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock →
+  OCR-style home assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
 - **Tests**: `dotnet test` (194 tests: core math/compile, engine physics, Lua scenarios,
   klipper wire+protocol, PWM components, HIL seam + physics taps, transmission

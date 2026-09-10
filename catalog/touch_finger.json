@@ -15,10 +15,10 @@
     {
       "name": "tip",
       "parent_body": "root",
-      "relative_pose": { "pos": [0.1, 0, 0.024] },
+      "relative_pose": { "pos": [0.1, 0, 0.034] },
       "mass_kg": 0.004,
       "shapes": [
-        { "kind": "cylinder", "extents": [0.002, 0.006, 0], "relative_pose": { "pos": [0, 0, -0.006], "rot": [180, 0, 0] }, "rgba": "0.9 0.85 0.4 1" }
+        { "kind": "cylinder", "extents": [0.002, 0.012, 0], "relative_pose": { "pos": [0, 0, -0.006] }, "rgba": "0.9 0.85 0.4 1" }
       ],
       "actuated": "slide"
     }
@@ -27,10 +27,10 @@
     { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, 0.006], "rot": [180, 0, 0] } }
   ],
   "params": {
-    "min_pos_m": -0.008,
+    "min_pos_m": -0.03,
     "max_pos_m": 0.002,
     "servo_kp": 80.0,
-    "servo_kv": 0.4
+    "servo_kv": 1.1
   },
   "motor": {
     "kind": "servo",

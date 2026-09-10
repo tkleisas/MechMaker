@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.1",
+  "name": "phone_gantry_rig",
+  "description": "The androidtester gantry in miniature: a belt-driven carriage (linear_axis mechanics) rides a rail above the deck, carrying the touch_finger on its tool mount; the phone sits on a side plate under the travel. Park the carriage over the screen point (drive 'motor_left'), command the finger plunger down (set_finger_position) — the HIL bridge taps the emulator at the contact point.",
+  "parts": [
+    { "id": "base", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } },
+    { "id": "rail", "part": "mgn12_rail_400", "pose": {} },
+    { "id": "carriage", "part": "mgn12_carriage", "pose": {} },
+    { "id": "motor_left", "part": "nema17_stepper", "pose": {} },
+    { "id": "motor_right", "part": "nema17_stepper", "pose": {} },
+    { "id": "motor_plate_left", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "motor_plate_right", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "pulley_left", "part": "gt2_pulley_20t", "pose": {} },
+    { "id": "pulley_right", "part": "gt2_pulley_20t", "pose": {} },
+    { "id": "belt", "part": "gt2_belt_400", "pose": { "pos": [0, 0, 0] } },
+    { "id": "finger", "part": "touch_finger", "pose": {} },
+    { "id": "phone_plate", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "dut", "part": "android_phone", "pose": {} }
+  ],
+  "connections": [
+    { "id": "rail_on_beam", "part_a": "base", "connector_a": "top_mid", "part_b": "rail", "connector_b": "mount" },
+    { "id": "carriage_on_rail", "part_a": "rail", "connector_a": "carriage_top", "part_b": "carriage", "connector_b": "rail_side" },
+    { "id": "finger_on_carriage", "part_a": "carriage", "connector_a": "top", "part_b": "finger", "connector_b": "mount" },
+    { "id": "motor_plate_left_on_beam", "part_a": "base", "connector_a": "end_a", "part_b": "motor_plate_left", "connector_b": "tslot" },
+    { "id": "motor_left_on_plate", "part_a": "motor_plate_left", "connector_a": "motor_face", "part_b": "motor_left", "connector_b": "mount" },
+    { "id": "motor_plate_right_on_beam", "part_a": "base", "connector_a": "end_b", "part_b": "motor_plate_right", "connector_b": "tslot" },
+    { "id": "motor_right_on_plate", "part_a": "motor_plate_right", "connector_a": "motor_face", "part_b": "motor_right", "connector_b": "mount" },
+    { "id": "pulley_left_on_shaft", "part_a": "motor_left", "connector_a": "shaft", "part_b": "pulley_left", "connector_b": "bore" },
+    { "id": "pulley_right_on_shaft", "part_a": "motor_right", "connector_a": "shaft", "part_b": "pulley_right", "connector_b": "bore" },
+    { "id": "belt_left", "part_a": "belt", "connector_a": "end_a", "part_b": "pulley_left", "connector_b": "belt" },
+    { "id": "belt_right", "part_a": "belt", "connector_a": "end_b", "part_b": "pulley_right", "connector_b": "belt" },
+    { "id": "belt_clamp", "part_a": "carriage", "connector_a": "belt_clamp", "part_b": "belt", "connector_b": "clamp" },
+    { "id": "phone_plate_on_base", "part_a": "base", "connector_a": "top_a", "part_b": "phone_plate", "connector_b": "tslot" },
+    { "id": "phone_on_plate", "part_a": "phone_plate", "connector_a": "motor_face", "part_b": "dut", "connector_b": "nest" }
+  ],
+  "boards": [
+    { "id": "main", "type": "skr-pico" }
+  ],
+  "wiring": [
+    { "component": "motor_left", "signal": "step", "board": "main", "pin": "P2_2" },
+    { "component": "motor_left", "signal": "dir", "board": "main", "pin": "P2_6" },
+    { "component": "motor_left", "signal": "enable", "board": "main", "pin": "P2_1" },
+    { "component": "motor_right", "signal": "step", "board": "main", "pin": "P6_2" },
+    { "component": "motor_right", "signal": "dir", "board": "main", "pin": "P6_6" },
+    { "component": "motor_right", "signal": "enable", "board": "main", "pin": "P6_1" },
+    { "component": "finger", "signal": "pwm", "board": "main", "pin": "P1_1" }
+  ]
+}
