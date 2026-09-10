@@ -101,14 +101,16 @@ What works today:
   flagship scenario: `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock →
   OCR-style home assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (194 tests: core math/compile, engine physics, Lua scenarios,
-  klipper wire+protocol, PWM components, HIL seam + physics taps, transmission
+- **Tests**: `dotnet test` (195 tests: core math/compile, engine physics, Lua scenarios,
+  klipper wire+protocol, PWM components, HIL seam + physics taps + tap_at, transmission
   kinematics, server/session).
-- **MCP server** (`MechMaker.Server`): 40 tools over stdio that let LLM agents assemble,
-  wire, validate, compile, and simulate machines — catalog browsing, part placement,
-  typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
-  compilation, and live closed-loop runs (enable/command motors, add endstops, watch
-  for stalls).
+- **MCP server** (`MechMaker.Server`): 45 tools over stdio that let LLM agents assemble,
+  wire, validate, compile, simulate, render, and drive real Android UIs — catalog
+  browsing, part placement, typed-connector connections, board wiring, `mmNNN`
+  validation diagnostics, MJCF compilation, live closed-loop runs (motors, endstops,
+  stalls), scene rendering, and the HIL action loop.
+
+A walkthrough with verified numbers and screenshots: **[docs/01-analysis.md](docs/01-analysis.md)**.
 
 Two modeling lessons are baked in and documented in code: the physics runs at 8 kHz
 because the stepper's magnetic spring is stiff, and the ground plane is visual-only
@@ -152,8 +154,9 @@ The catalog directory is found by walking up from the working directory (or set
 ```
 catalog/                 part definitions (JSON)
 examples/                example machines (incl. linear_axis_agent.json, assembled end-to-end via MCP tools)
+docs/                    01-analysis.md — architecture & verified behaviour (with rendered images)
 scripts/                 Lua simulation scenarios
-tools/                   self-checking MCP stdio end-to-end tests (mcp_e2e, hil_live, scenario_smoke_wake_unlock) + emulator_start
+tools/                   mcp_e2e, hil_live, scenario_smoke_wake_unlock (stdio e2e) + emulator_start + render
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
 src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU + Lua + Klipper MCU

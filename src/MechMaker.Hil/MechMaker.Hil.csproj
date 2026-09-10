@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\MechMaker.Engine\MechMaker.Engine.csproj" />
     <ProjectReference Include="..\MechMaker.Core\MechMaker.Core.csproj" />
   </ItemGroup>
 

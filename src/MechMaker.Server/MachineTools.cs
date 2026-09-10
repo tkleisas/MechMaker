@@ -284,6 +284,18 @@ public static class MachineTools
     [Description("HIL session state: phone pairing, emulator transport, physics-contact taps dispatched.")]
     public static string HilStatus() => Locked(() => W.HilStatus());
 
+    [McpServerTool(Name = "render_scene")]
+    [Description("Screenshot the session machine: compiles it and renders the 3D scene with the " +
+                 "software renderer (headless — no app needed). With live=true and an active run, " +
+                 "renders the machine's current animated pose. Returns the byte count; pass " +
+                 "outputPath to save the PNG (then view it). Agents: use this to see what you built.")]
+    public static string RenderScene(
+        [Description("Output PNG path (optional; without it only the byte count is reported)")] string? outputPath = null,
+        [Description("Render the live run's current pose instead of the edit scene")] bool live = false,
+        [Description("Camera yaw in radians (default 0.7)")] double? yawRad = null,
+        [Description("Camera pitch in radians (default 0.55)")] double? pitchRad = null)
+        => Locked(() => W.RenderScene(outputPath, live, yawRad, pitchRad));
+
     [McpServerTool(Name = "tap_at")]
     [Description("One physical tap at a screen fraction: the gantry parks the finger over " +
                  "that point (correct-and-retry positioning), the plunger presses the glass, " +

@@ -7,7 +7,7 @@ namespace MechMaker.Server.Tests;
 /// emulator, captures templates, finds elements with real OpenCV matching, and taps
 /// — the androidtester action loop, tool by tool.
 /// </summary>
-public class HilToolsTests : IDisposable
+public partial class HilToolsTests : IDisposable
 {
     private readonly FakeEmulatorTransport _emulator = new();
     private readonly McpWorkspace _w = TestRepo.ExampleWorkspace();
@@ -161,3 +161,34 @@ public class HilToolsTests : IDisposable
         return double.Parse(text[start..end], System.Globalization.CultureInfo.InvariantCulture) / 100.0;
     }
 }
+
+public partial class HilToolsTests
+{
+    [Fact]
+    public void Render_scene_writes_a_decodable_png_of_the_machine()
+    {
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "phone_gantry_rig.json"));
+        var outPath = TempPath("gantry.png");
+        var result = _w.RenderScene(outPath, live: false, yawRad: null, pitchRad: null);
+
+        Assert.Contains("edit scene", result);
+        var png = File.ReadAllBytes(outPath);
+        Assert.Equal("89-50-4E-47", string.Join("-", png[0..4].Select(b => b.ToString("X2"))));
+        // A real render: well past the 5-byte minimum block, substantial pixel data.
+        Assert.True(png.Length > 5000, $"png too small: {png.Length}");
+    }
+
+    [Fact]
+    public void Render_scene_live_captures_the_animated_pose()
+    {
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "linear_axis_v0.json"));
+        _w.StartRun();
+        _w.EnableMotor("motor_left", true);
+        _w.SetMotorVelocity("motor_left", 1.0);
+        _w.RunFor(0.5);
+
+        var live = _w.RenderScene(null, live: true, yawRad: null, pitchRad: null);
+        Assert.Contains("live frame at t=0.5", live);
+    }
+}
+

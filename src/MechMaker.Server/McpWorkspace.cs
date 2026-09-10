@@ -5,6 +5,7 @@ using MechMaker.Core.Validation;
 using MechMaker.Engine;
 using MechMaker.Engine.Hil;
 using MechMaker.Engine.Klipper;
+using MechMaker.Engine.Rendering;
 using MechMaker.Engine.Scripting;
 using MechMaker.Hil;
 
@@ -531,6 +532,50 @@ public string SetServoAngle(string instanceId, double degrees)
 
 private HilSession RequireHil() =>
         _hil ?? throw new InvalidOperationException("No HIL session — call hil_connect first.");
+
+    // ---------- scene rendering (agent-facing screenshots) ----------
+
+    /// <summary>
+    /// Renders the session machine to a PNG: the edit scene (or the live run's
+    /// current pose when a run is active and <paramref name="live"/> is set).
+    /// The software renderer works headless — no app, no OS screenshot.
+    /// </summary>
+    public string RenderScene(string? outputPath, bool live, double? yawRad, double? pitchRad)
+    {
+        byte[] png;
+        string what;
+        if (live && _run is not null)
+        {
+            png = SceneRenderer.RenderLiveScene(_run, yawRad: yawRad, pitchRad: pitchRad);
+            what = $"live frame at t={_run.Simulator.Time:0.###} s";
+        }
+        else
+        {
+            what = "edit scene";
+            png = RenderSessionScene(yawRad, pitchRad);
+        }
+
+        if (outputPath is null)
+            return $"Rendered {what}: {png.Length} bytes (pass outputPath to save the PNG).";
+        var full = Path.GetFullPath(outputPath);
+        File.WriteAllBytes(full, png);
+        return $"Rendered {what} ({png.Length} bytes) -> '{full}'.";
+    }
+
+    private byte[] RenderSessionScene(double? yawRad, double? pitchRad)
+    {
+        // Render the session machine's compiled scene without touching the disk.
+        var compiler = new MechMaker.Core.Compilation.MjcfCompiler(Catalog);
+        var mjcf = compiler.Compile(_machine).ToString();
+        using var simulator = Simulator.FromMjcf(mjcf);
+        simulator.RefreshKinematics();
+        var scene = simulator.GetScene();
+        var camera = new OrbitCamera { YawRad = yawRad ?? 0.7, PitchRad = pitchRad ?? 0.55 };
+        SceneRenderer.Frame(scene, camera);
+        var triangles = SceneTessellator.Tessellate(scene);
+        var pixels = new SoftRenderer().RenderBgra(triangles, camera, 960, 640);
+        return SceneRenderer.BgraToPng(pixels, 960, 640);
+    }
 
     /// <summary>
     /// One physical tap at a screen fraction: resolves the gantry (the finger's
