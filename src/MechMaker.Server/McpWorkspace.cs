@@ -414,10 +414,7 @@ public sealed class McpWorkspace : IDisposable
         IEmulatorTransport emulator = transport.ToLowerInvariant() switch
         {
             "fake" => new FakeEmulatorTransport(),
-            "adb" => new AdbEmulatorTransport(
-                adbPath ?? Environment.GetEnvironmentVariable("ANDROID_ADB") ?? "adb",
-                adbSerial ?? Environment.GetEnvironmentVariable("ANDROID_SERIAL") ?? "emulator-5554",
-                ResolvePhoneResolution()),
+            "adb" => new AdbEmulatorTransport(adbPath, adbSerial, ResolvePhoneResolution()),
             _ => throw new ArgumentException($"Unknown transport '{transport}' (use 'fake' or 'adb').")
         };
         return HilConnect(emulator);

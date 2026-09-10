@@ -34,14 +34,25 @@ public interface IEmulatorTransport
 /// </summary>
 public sealed class AdbEmulatorTransport : IEmulatorTransport
 {
+    /// <summary>The default adb path: ANDROID_ADB env, then the standard SDK location.</summary>
+    public static string DefaultAdbPath =>
+        Environment.GetEnvironmentVariable("ANDROID_ADB")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Android", "Sdk", "platform-tools", "adb.exe");
+
+    /// <summary>The default emulator serial: ANDROID_SERIAL env, else the first emulator.</summary>
+    public static string DefaultSerial =>
+        Environment.GetEnvironmentVariable("ANDROID_SERIAL") ?? "emulator-5554";
+
     private readonly string _adbPath;
     private readonly string _serial;
     private readonly (int X, int Y) _resolution;
 
-    public AdbEmulatorTransport(string adbPath, string serial, (int X, int Y) resolution)
+    public AdbEmulatorTransport(string? adbPath = null, string? serial = null,
+        (int X, int Y) resolution = default)
     {
-        _adbPath = adbPath;
-        _serial = serial;
+        _adbPath = adbPath ?? DefaultAdbPath;
+        _serial = serial ?? DefaultSerial;
         _resolution = resolution;
     }
 
@@ -66,7 +77,26 @@ public sealed class AdbEmulatorTransport : IEmulatorTransport
         Run($"shell input swipe {Pixels(fx1, fy1).Item1} {Pixels(fx1, fy1).Item2} " +
             $"{Pixels(fx2, fy2).Item1} {Pixels(fx2, fy2).Item2} {durationMs}");
 
-    public byte[] Screencap() => Run("shell screencap -p").Output;
+    public byte[] Screencap()
+    {
+        // adb's exec-out corrupts binary on Windows (CRLF translation in the console
+        // layer). The robust path: screencap to a device file, adb pull to a temp
+        // file, clean up — file transfer is byte-exact.
+        var devicePath = "/data/local/tmp/mechmaker_screencap.png";
+        var localPath = Path.Combine(Path.GetTempPath(), $"mechmaker_cap_{Guid.NewGuid():N}.png");
+        try
+        {
+            Run($"shell screencap -p {devicePath}");
+            Run($"pull {devicePath} \"{localPath}\"");
+            var png = File.ReadAllBytes(localPath);
+            try { Run($"shell rm {devicePath}"); } catch { /* best effort */ }
+            return png;
+        }
+        finally
+        {
+            try { File.Delete(localPath); } catch (IOException) { }
+        }
+    }
 
     private (int X, int Y) Pixels(double fx, double fy) =>
         (Math.Clamp((int)Math.Round(fx * (_resolution.X - 1)), 0, _resolution.X - 1),

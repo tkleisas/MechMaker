@@ -78,14 +78,15 @@ What works today:
   40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak handling). Exposed
   to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
 - **HIL seam — Android emulator + OpenCV** (`MechMaker.Hil`): the machine's
-  `android_phone` part pairs with an emulator (fake transport for tests, live adb for
-  sessions) so the rig's touch actions drive a real Android UI and vision reads the
-  screen — the androidtester/steropes loop, tool by tool: `hil_connect` →
-  `screen_screencap` → `screen_find` / `screen_wait_for` (OpenCV template matching,
-  fraction coordinates like androidtester's `touch.tap {from: [50%, 90%]}`) →
-  `touch_tap` / `touch_swipe`. The live adb transport ships behind the same interface;
-  physics-contact taps (a simulated finger actually pressing the screen) are the
-  next phase.
+  `android_phone` part pairs with an emulator — **live over adb (verified end-to-end
+  against a real Android 16 emulator: screencap → template → OpenCV find → tap), with
+  a fake transport for offline tests** — so the rig's touch actions drive a real
+  Android UI and vision reads the screen, the androidtester/steropes loop, tool by
+  tool: `hil_connect` → `screen_screencap` → `screen_find` / `screen_wait_for`
+  (OpenCV template matching, fraction coordinates like androidtester's
+  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. The live check is
+  `tools/hil_live.ps1` (needs a booted emulator). Physics-contact taps (a simulated
+  finger actually pressing the screen) are the next phase.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
 - **Tests**: `dotnet test` (189 tests: core math/compile, engine physics, Lua scenarios,
   klipper wire+protocol, PWM components, HIL seam, transmission kinematics, server/session).
@@ -137,7 +138,7 @@ The catalog directory is found by walking up from the working directory (or set
 catalog/                 part definitions (JSON)
 examples/                example machines (incl. linear_axis_agent.json, assembled end-to-end via MCP tools)
 scripts/                 Lua simulation scenarios
-tools/                   mcp_e2e.ps1 — self-checking MCP stdio end-to-end test
+tools/                   mcp_e2e.ps1 + hil_live.ps1 — self-checking MCP stdio end-to-end tests
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
 src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU + Lua + Klipper MCU
