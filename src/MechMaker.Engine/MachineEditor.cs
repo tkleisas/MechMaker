@@ -286,8 +286,10 @@ public sealed class MachineEditor : IDisposable
     {
         StopRun();
         _running = MachineSimulation.FromMachine(Machine, Catalog);
-        foreach (var stepper in _running.Mcu.Steppers)
-            stepper.Enable();
+        // Channels start de-energized, like a real board after power-on. Belt-coupled
+        // rotors are mirrored by an equality constraint, so energizing every motor
+        // makes them fight through the belt; the host enables exactly the motors it
+        // drives and lets the belt back-drive the rest.
         return _running;
     }
 

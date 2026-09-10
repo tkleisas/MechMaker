@@ -27,12 +27,22 @@ public partial class MainWindow : Window
         MachineList.SelectionChanged += OnPartSelected;
         CatalogList.SelectionChanged += OnCatalogSelected;
         Loaded += (_, _) => Startup();
+
+        // Grid style controls: live updates (XAML can't wire ColorChanged directly).
+        GridLineColor.Color = Color.FromRgb(0x3B, 0x3D, 0x44);
+        GridLineColor.ColorChanged += (_, _) => RebuildReferenceShapes();
+        GridThickness.ValueChanged += (_, _) => RebuildReferenceShapes();
+        GridSpacing.SelectionChanged += (_, _) => RebuildReferenceShapes();
     }
 
     private void Startup()
     {
         var repo = FindRepoRoot();
-        var machinePath = Path.Combine(repo, "examples", "linear_axis_v0.json");
+        // Optional CLI arg: MechMaker.App [machine.json] — defaults to the example axis.
+        var cmdline = Environment.GetCommandLineArgs();
+        var machinePath = cmdline.Length > 1
+            ? Path.GetFullPath(cmdline[1])
+            : Path.Combine(repo, "examples", "linear_axis_v0.json");
         _editor = new MachineEditor(Path.Combine(repo, "catalog"), machinePath);
         _editor.MachineChanged += RefreshMachineUi;
         RefreshMachineUi();
@@ -237,6 +247,10 @@ public partial class MainWindow : Window
                 return;
             }
             _simulation = _editor.StartRun();
+            // Drive the first wired stepper (the example axis is one belt-coupled
+            // degree of freedom; the belt back-drives the second motor, as in
+            // hardware with a released slave).
+            _simulation.Mcu.Steppers.FirstOrDefault()?.Enable();
             RunButton.Content = "■ Stop";
             ModeText.Text = "RUNNING";
             Viewport.Continuous = true;
@@ -258,10 +272,11 @@ public partial class MainWindow : Window
     {
         if (_simulation is null)
             return;
-        // Cruise every wired stepper at the toolbar speed; ~30 ms of sim time per frame.
+        // Command only the driven (first) stepper: belt-coupled rotors are mirrored
+        // by an equality constraint, so commanding both the same way makes them
+        // fight through the belt and the axis just judders.
         var speed = TryParseDouble(RunSpeed.Text, 1.0);
-        foreach (var stepper in _simulation.Mcu.Steppers)
-            stepper.SetVelocityRevPerSec(speed);
+        _simulation.Mcu.Steppers.FirstOrDefault()?.SetVelocityRevPerSec(speed);
         _simulation.RunFor(0.03);
     }
 

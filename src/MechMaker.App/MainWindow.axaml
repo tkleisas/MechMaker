@@ -21,15 +21,14 @@
           <TextBlock Text="Grid…" />
         </StackPanel>
       </Button>
-      <Popup x:Name="GridPopup" PlacementMode="Bottom" IsLightDismissEnabled="True">
+      <Popup x:Name="GridPopup" IsLightDismissEnabled="True">
         <Border Background="#1E1E22" BorderBrush="#555" BorderThickness="1" CornerRadius="6"
                 Padding="12" Width="260">
           <StackPanel Spacing="8">
             <TextBlock Text="Reference grid" FontWeight="Bold" />
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
               <TextBlock Grid.Row="0" Grid.Column="0" Text="Color" VerticalAlignment="Center" Margin="0,0,8,0" />
-              <ColorPicker x:Name="GridLineColor" Grid.Row="0" Grid.Column="1"
-                           Color="#3B3D44" ColorChanged="OnGridStyleChanged" />
+              <ColorPicker x:Name="GridLineColor" Grid.Row="0" Grid.Column="1" />
               <TextBlock Grid.Row="1" Grid.Column="0" Text="Thickness" VerticalAlignment="Center" Margin="0,0,8,0" />
               <Slider x:Name="GridThickness" Grid.Row="1" Grid.Column="1" Minimum="0.2" Maximum="3"
                       Value="0.8" TickFrequency="0.2" />
