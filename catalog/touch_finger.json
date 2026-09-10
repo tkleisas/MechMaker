@@ -1,0 +1,30 @@
+{
+  "id": "touch_finger",
+  "name": "Conductive touch finger (toolhead)",
+  "category": "tool",
+  "description": "The androidtester finger tool: mounts under a plate, arms over on a horizontal arm, and the conductive tip hangs on an unactuated slide (gravity drops it). When the tip presses the android_phone's glass, the HIL bridge dispatches emulator taps at the contact point. Tip rest height tunes the gap to the screen.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.04,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.006, 0.012, 0], "rgba": "0.3 0.3 0.35 1" },
+        { "kind": "cylinder", "extents": [0.004, 0.05, 0], "relative_pose": { "pos": [0.05, 0, 0.012], "rot": [90, 0, 0] }, "rgba": "0.3 0.3 0.35 1" }
+      ]
+    },
+    {
+      "name": "tip",
+      "parent_body": "root",
+      "relative_pose": { "pos": [0.1, 0, 0.027] },
+      "mass_kg": 0.004,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.002, 0.006, 0], "relative_pose": { "pos": [0, 0, -0.006], "rot": [180, 0, 0] }, "rgba": "0.9 0.85 0.4 1" }
+      ],
+      "actuated": "slide"
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, 0.006], "rot": [180, 0, 0] } }
+  ],
+  "params": { "tip_radius_m": 0.002 }
+}

@@ -27,7 +27,7 @@ public class CatalogTests
     {
         var catalog = TestRepo.Catalog();
 
-        Assert.Equal(17, catalog.All.Count);
+        Assert.Equal(18, catalog.All.Count);
         var motor = catalog.Get("nema17_stepper");
         Assert.NotNull(motor.Motor);
         Assert.Equal(MotorKind.Stepper, motor.Motor!.Kind);
@@ -191,5 +191,6 @@ public class CompilerTests
         Assert.Equal(machine.Wiring.Count, roundTripped.Wiring.Count);
     }
 }
+
 
 

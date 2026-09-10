@@ -263,6 +263,17 @@ public static class MachineTools
         [Description("Emulator serial (adb transport only, default emulator-5554)")] string? adbSerial = null)
         => Locked(() => W.HilConnect(transport, adbPath, adbSerial));
 
+    [McpServerTool(Name = "arm_physics_taps")]
+    [Description("Arm physics-contact taps: place a touch_finger over the phone, start a run, " +
+                 "then arm — when the finger's tip presses the phone's screen in the physics " +
+                 "(command the finger's joint or drive it with a stepper), the contact point is " +
+                 "mapped to screen fractions and dispatched to the emulator. One tap per press.")]
+    public static string ArmPhysicsTaps() => Locked(() => W.ArmPhysicsTaps());
+
+    [McpServerTool(Name = "hil_status")]
+    [Description("HIL session state: phone pairing, emulator transport, physics-contact taps dispatched.")]
+    public static string HilStatus() => Locked(() => W.HilStatus());
+
     [McpServerTool(Name = "touch_tap")]
     [Description("Tap the phone screen at a fraction position [0..1]² (origin top-left) — " +
                  "dispatched to the emulator over adb/fake transport. Find positions with screen_find.")]

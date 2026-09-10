@@ -108,6 +108,19 @@ public class HilToolsTests : IDisposable
         OpenCvSharp.Cv2.Rectangle(mat, new OpenCvSharp.Rect(12, 12, 16, 16), new OpenCvSharp.Scalar(150, 150, 160), -1);
         OpenCvSharp.Cv2.ImEncode(".png", mat, out var png);
         File.WriteAllBytes(path, png.ToArray());
+        File.WriteAllBytes(path, png.ToArray());
         return path;
+    }
+
+    [Fact]
+    public void Physics_taps_dispatch_when_the_finger_presses_the_glass()
+    {
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "phone_test_rig.json"));
+        Assert.Contains("phone 'dut'", _w.HilConnect(_emulator));
+        _w.StartRun();
+        Assert.Contains("armed", _w.ArmPhysicsTaps());
+
+        _w.RunFor(0.05);
+        Assert.Contains("physics taps dispatched", _w.HilStatus());
     }
 }

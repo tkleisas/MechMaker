@@ -13,8 +13,10 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path $PSScriptRoot -Parent
 Push-Location $repo
 
+# Self-start: boot the emulator if it isn't already running.
 $env:ANDROID_ADB = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $env:ANDROID_SERIAL = "emulator-5554"
+& (Join-Path $PSScriptRoot "emulator_start.ps1")
 $script:failures = 0
 
 function Check($name, $ok, $detail = "") {

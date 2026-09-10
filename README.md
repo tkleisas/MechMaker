@@ -84,12 +84,16 @@ What works today:
   Android UI and vision reads the screen, the androidtester/steropes loop, tool by
   tool: `hil_connect` → `screen_screencap` → `screen_find` / `screen_wait_for`
   (OpenCV template matching, fraction coordinates like androidtester's
-  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. The live check is
-  `tools/hil_live.ps1` (needs a booted emulator). Physics-contact taps (a simulated
-  finger actually pressing the screen) are the next phase.
+  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. **Physics-contact
+  taps are live**: a `touch_finger` part pressing the phone's glass in the physics
+  (gravity-driven slide tip) dispatches emulator taps at the contact point
+  (`arm_physics_taps`). Rig: `examples/phone_test_rig.json`; flagship scenario:
+  `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock → OCR-style home
+  assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (189 tests: core math/compile, engine physics, Lua scenarios,
-  klipper wire+protocol, PWM components, HIL seam, transmission kinematics, server/session).
+- **Tests**: `dotnet test` (194 tests: core math/compile, engine physics, Lua scenarios,
+  klipper wire+protocol, PWM components, HIL seam + physics taps, transmission
+  kinematics, server/session).
 - **MCP server** (`MechMaker.Server`): 40 tools over stdio that let LLM agents assemble,
   wire, validate, compile, and simulate machines — catalog browsing, part placement,
   typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
@@ -138,7 +142,7 @@ The catalog directory is found by walking up from the working directory (or set
 catalog/                 part definitions (JSON)
 examples/                example machines (incl. linear_axis_agent.json, assembled end-to-end via MCP tools)
 scripts/                 Lua simulation scenarios
-tools/                   mcp_e2e.ps1 + hil_live.ps1 — self-checking MCP stdio end-to-end tests
+tools/                   self-checking MCP stdio end-to-end tests (mcp_e2e, hil_live, scenario_smoke_wake_unlock) + emulator_start
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
 src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU + Lua + Klipper MCU

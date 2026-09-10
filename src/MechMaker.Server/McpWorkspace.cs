@@ -408,6 +408,33 @@ public sealed class McpWorkspace : IDisposable
 
     private HilSession? _hil;
 
+    /// <summary>
+    /// Arms physics-contact taps: a touch_finger pressing the phone's screen in the
+    /// physics dispatches emulator taps at the contact point. The bridge rides the
+    /// MCU's PostTick so every run_for slice checks contacts.
+    /// </summary>
+    public string ArmPhysicsTaps()
+    {
+        if (_hil is null)
+            throw new InvalidOperationException("No HIL session — call hil_connect first.");
+        var phone = FindPhone() ?? throw new InvalidOperationException("No android_phone part.");
+        var finger = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "touch_finger")
+            ?? throw new InvalidOperationException("No touch_finger part — place one over the phone.");
+
+        _tapBridge = new PhysicsTapBridge(RequireRun(), phone.Id, finger.Id,
+            (fx, fy) => { _hil.Tap(fx, fy); });
+        _tapBridge.Arm();
+        _run!.Mcu.PostTick += () => _tapBridge.Tick();
+        return $"Physics taps armed: '{finger.Id}' -> '{phone.Id}' screen " +
+               "(one tap per contact episode; watch dispatched taps via hil_status).";
+    }
+
+
+    private PhysicsTapBridge? _tapBridge;
+
+    private PartInstance? FindPhone() =>
+        _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "android_phone");
+
     /// <summary>Connects a HIL session over a fake emulator (tests/offline) or adb.</summary>
     public string HilConnect(string transport = "fake", string? adbPath = null, string? adbSerial = null)
     {
@@ -488,8 +515,26 @@ public sealed class McpWorkspace : IDisposable
         return $"Captured {png.Length} bytes -> '{Path.GetFullPath(outputPath)}'.";
     }
 
-    private HilSession RequireHil() =>
+private HilSession RequireHil() =>
         _hil ?? throw new InvalidOperationException("No HIL session — call hil_connect first.");
+
+    public string HilStatus()
+    {
+        var hil = RequireHil();
+        var lines = new List<string> { hil.ToString() };
+        if (_tapBridge is { } bridge)
+        {
+            lines.Add(bridge.DispatchedTaps.Count == 0
+                ? "physics taps: armed, none dispatched yet"
+                : "physics taps dispatched at: " + string.Join("; ", bridge.DispatchedTaps
+                    .Select(t => $"({t.Fx * 100:0.#}%, {t.Fy * 100:0.#}%)")));
+        }
+        else
+        {
+            lines.Add("physics taps: not armed (arm_physics_taps)");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
 
     // ---------- run mode ----------
 
@@ -620,3 +665,4 @@ public sealed class McpWorkspace : IDisposable
 
     public void Dispose() => _run?.Dispose();
 }
+

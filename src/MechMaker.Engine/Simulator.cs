@@ -122,6 +122,20 @@ public sealed unsafe class Simulator : IDisposable
 
     public int ContactCount => (int)_data->ncon;
 
+    /// <summary>Active contacts with world positions (the contact point midpoint) —
+    /// the input the HIL physics-contact bridge consumes.</summary>
+    public IReadOnlyList<(string Geom1, string Geom2, double X, double Y, double Z)> Contacts()
+    {
+        var list = new List<(string, string, double, double, double)>((int)_data->ncon);
+        for (var i = 0; i < _data->ncon; i++)
+        {
+            var c = _data->contact[i];
+            list.Add((GeomName(c.geom1), GeomName(c.geom2),
+                c.pos[0], c.pos[1], c.pos[2]));
+        }
+        return list;
+    }
+
     private string GeomName(int id)
         => Marshal.PtrToStringUTF8((IntPtr)MuJoCo.mj_id2name(_model, (int)mjtObj.mjOBJ_GEOM, id)) ?? $"geom{id}";
 
