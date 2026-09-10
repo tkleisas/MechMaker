@@ -131,4 +131,33 @@ public class HilToolsTests : IDisposable
 
         Assert.Contains("physics taps dispatched", _w.HilStatus());
     }
+
+    [Fact]
+    public void Tap_at_positions_the_gantry_and_taps_the_commanded_column()
+    {
+        // The full vision→motion→contact loop: tap_at two different screen
+        // fractions on the gantry rig; each tap lands in its commanded column
+        // (within the belt's convergence tolerance) and dispatches to the emulator.
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "phone_gantry_rig.json"));
+        Assert.Contains("phone 'dut'", _w.HilConnect(_emulator));
+        _w.StartRun();
+        _w.ArmPhysicsTaps();
+
+        var left = _w.TapAt(0.35);
+        Assert.Contains("Physical tap dispatched", left);
+        var leftFx = Fraction(left, "dispatched at (", "%");
+        Assert.InRange(leftFx, 0.28, 0.45); // near the commanded 35%
+
+        var right = _w.TapAt(0.65);
+        var rightFx = Fraction(right, "dispatched at (", "%");
+        Assert.InRange(rightFx, 0.55, 0.75); // near the commanded 65%
+        Assert.True(rightFx > leftFx, $"expected rightward: {leftFx:0.###} -> {rightFx:0.###}");
+    }
+
+    private static double Fraction(string text, string prefix, string terminator)
+    {
+        var start = text.IndexOf(prefix, StringComparison.Ordinal) + prefix.Length;
+        var end = text.IndexOf(terminator, start, StringComparison.Ordinal);
+        return double.Parse(text[start..end], System.Globalization.CultureInfo.InvariantCulture) / 100.0;
+    }
 }

@@ -284,6 +284,18 @@ public static class MachineTools
     [Description("HIL session state: phone pairing, emulator transport, physics-contact taps dispatched.")]
     public static string HilStatus() => Locked(() => W.HilStatus());
 
+    [McpServerTool(Name = "tap_at")]
+    [Description("One physical tap at a screen fraction: the gantry parks the finger over " +
+                 "that point (correct-and-retry positioning), the plunger presses the glass, " +
+                 "and the contact point is dispatched to the emulator through the bridge. " +
+                 "Needs: hil_connect, start_run, arm_physics_taps, a touch_finger on a " +
+                 "belt-driven carriage, and a wired gantry stepper. Returns the measured " +
+                 "fraction the tip actually pressed (the gantry parks where the physics puts it).")]
+    public static string TapAt(
+        [Description("Fraction X across the screen")] double fx,
+        [Description("Fraction Y (reported; the arm rides a fixed row on the current gantry stage)")] double fy = 0.5)
+        => Locked(() => W.TapAt(fx, fy));
+
     [McpServerTool(Name = "touch_tap")]
     [Description("Tap the phone screen at a fraction position [0..1]² (origin top-left) — " +
                  "dispatched to the emulator over adb/fake transport. Find positions with screen_find.")]

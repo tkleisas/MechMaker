@@ -3,6 +3,7 @@ using MechMaker.Core.Compilation;
 using MechMaker.Core.Model;
 using MechMaker.Core.Validation;
 using MechMaker.Engine;
+using MechMaker.Engine.Hil;
 using MechMaker.Engine.Klipper;
 using MechMaker.Engine.Scripting;
 using MechMaker.Hil;
@@ -530,6 +531,49 @@ public string SetServoAngle(string instanceId, double degrees)
 
 private HilSession RequireHil() =>
         _hil ?? throw new InvalidOperationException("No HIL session — call hil_connect first.");
+
+    /// <summary>
+    /// One physical tap at a screen fraction: resolves the gantry (the finger's
+    /// parent connection partner + the first wired stepper), measures the live
+    /// geometry, positions, presses, retracts. Requires arm_physics_taps (the
+    /// dispatched tap reaches the emulator through the same bridge).
+    /// </summary>
+    public string TapAt(double fx, double fy = 0.5)
+    {
+        if (_hil is null)
+            throw new InvalidOperationException("No HIL session — call hil_connect first.");
+        var bridge = _tapBridge ?? throw new InvalidOperationException(
+            "Physics taps not armed — call arm_physics_taps first.");
+
+        var phone = FindPhone() ?? throw new InvalidOperationException("No android_phone part.");
+        var finger = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "touch_finger")
+            ?? throw new InvalidOperationException("No touch_finger part.");
+        var carriage = CarriageOf(finger.Id)
+            ?? throw new InvalidOperationException("The finger has no parent connection (no gantry to move).");
+        var stepper = _machine.Wiring
+            .Where(w => w.Signal == "step")
+            .Select(w => w.Component)
+            .FirstOrDefault(id => _machine.Parts.Any(p => p.Id == id))
+            ?? throw new InvalidOperationException("No wired stepper to drive the gantry.");
+
+        var phoneDef = Catalog.Get(phone.Part);
+        var screenWidth = phoneDef.Params.GetValueOrDefault("screen_width_m", 0.068);
+
+        var controller = new TapAtController(RequireRun(), phone.Id, finger.Id,
+            carriage, stepper, screenWidth);
+        var (achievedFx, achievedFy) = controller.Tap(fx);
+        return $"Physical tap dispatched at ({achievedFx * 100:0.#}%, {achievedFy * 100:0.#}%) " +
+               $"(commanded ({fx * 100:0.#}%, {fy * 100:0.#}%)).";
+    }
+
+    /// <summary>The part the finger mounts to (its connection partner).</summary>
+    private string? CarriageOf(string fingerId) =>
+        _machine.Connections
+            .Where(c => c.PartA == fingerId || c.PartB == fingerId)
+            .Select(c => c.PartA == fingerId ? c.PartB : c.PartA)
+            .FirstOrDefault(id => Catalog.Find(_machine.Parts
+                .FirstOrDefault(p => p.Id == id)?.Part ?? "")?.Id != "touch_finger"
+                && _machine.Parts.Any(p => p.Id == id));
 
     public string HilStatus()
     {
