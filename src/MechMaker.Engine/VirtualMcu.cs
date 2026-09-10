@@ -12,6 +12,9 @@ namespace MechMaker.Engine;
 public sealed class VirtualMcu
 {
     private readonly List<StepperChannel> _steppers = [];
+    private readonly List<ServoChannel> _servos = [];
+    private readonly List<FanChannel> _fans = [];
+    private readonly List<ThermalChannel> _heaters = [];
     private readonly List<EndstopChannel> _endstops = [];
 
     internal VirtualMcu(Simulator simulator, double controlPeriod = 0.001)
@@ -43,6 +46,32 @@ public sealed class VirtualMcu
         return channel;
     }
 
+/// <summary>A hobby/position servo: the position actuator's target angle.</summary>
+    public ServoChannel AddServo(string actuatorName, double minAngleDeg, double maxAngleDeg)
+    {
+        var channel = new ServoChannel(this, actuatorName, minAngleDeg, maxAngleDeg);
+        _servos.Add(channel);
+        return channel;
+    }
+
+    /// <summary>A DC fan: velocity actuator, duty scales the rated speed.</summary>
+    public FanChannel AddFan(string actuatorName, double ratedRevPerSec)
+    {
+        var channel = new FanChannel(this, actuatorName, ratedRevPerSec);
+        _fans.Add(channel);
+        return channel;
+    }
+
+    /// <summary>A heater (hotend, bed): lumped thermal model integrated per MCU tick.</summary>
+    public ThermalChannel AddHeater(string instanceId, double powerWatts, double thermalMassJPerK,
+        double coolingWPerK, double ambientC)
+    {
+        var channel = new ThermalChannel(instanceId, powerWatts, thermalMassJPerK, coolingWPerK,
+            ambientC, ControlPeriod);
+        _heaters.Add(channel);
+        return channel;
+    }
+
     /// <summary>Senses a joint coordinate against a trigger — how a printer endstop works:
     /// pressed when the carriage reaches the limit position.</summary>
     public EndstopChannel AddEndstop(string jointName, double triggerPosition, int debounceTicks = 3)
@@ -57,6 +86,12 @@ public sealed class VirtualMcu
         Clock++;
         foreach (var stepper in _steppers)
             stepper.Tick();
+        foreach (var servo in _servos)
+            servo.Tick();
+        foreach (var fan in _fans)
+            fan.Tick();
+        foreach (var heater in _heaters)
+            heater.Tick();
         foreach (var endstop in _endstops)
             endstop.Tick();
         PostTick?.Invoke();
@@ -313,5 +348,138 @@ public sealed class EndstopChannel
         var raw = position <= _triggerPosition;
         _consecutive = raw ? _consecutive + 1 : 0;
         Pressed = _consecutive >= _debounceTicks;
+    }
+}
+
+/// <summary>A PWM-driven channel (klipper's set_pwm_out): duty 0..1 maps to the
+/// channel's own actuation (servo angle sweep, fan speed).</summary>
+public interface IPwmChannel
+{
+    void ApplyDuty(double duty);
+}
+
+/// <summary>A position servo channel: the position actuator's target, written to ctrl
+/// every tick. Duty sweeps the configured angle range (like a real servo driver).</summary>
+public sealed class ServoChannel : IPwmChannel
+{
+    private readonly VirtualMcu _mcu;
+    private readonly int _actuatorId;
+    private readonly string _jointName;
+    private readonly double _minAngleDeg;
+    private readonly double _maxAngleDeg;
+
+    internal ServoChannel(VirtualMcu mcu, string actuatorName, double minAngleDeg, double maxAngleDeg)
+    {
+        _mcu = mcu;
+        _actuatorId = mcu.Simulator.ActuatorId(actuatorName);
+        _jointName = mcu.Simulator.JointForActuator(_actuatorId);
+        _minAngleDeg = minAngleDeg;
+        _maxAngleDeg = maxAngleDeg;
+    }
+
+    /// <summary>The joint this servo positions (e.g. j_servo_arm).</summary>
+    public string JointName => _jointName;
+
+    public double MinAngleDeg => _minAngleDeg;
+    public double MaxAngleDeg => _maxAngleDeg;
+
+    /// <summary>Commanded target angle in degrees (0 = the authored neutral pose).</summary>
+    public double TargetAngleDeg { get; private set; }
+
+    /// <summary>Actual joint angle in degrees.</summary>
+    public double AngleDeg => _mcu.Simulator.GetJointPos(_jointName) * 180.0 / Math.PI;
+
+    public void SetTargetAngleDeg(double degrees)
+    {
+        TargetAngleDeg = Math.Clamp(degrees, _minAngleDeg, _maxAngleDeg);
+    }
+
+    /// <summary>Duty 0..1 sweeps the angle range (0 → min, 1 → max).</summary>
+    public void ApplyDuty(double duty)
+    {
+        var d = Math.Clamp(duty, 0.0, 1.0);
+        SetTargetAngleDeg(_minAngleDeg + d * (_maxAngleDeg - _minAngleDeg));
+    }
+
+    internal void Tick() => _mcu.Simulator.SetCtrlByIndex(_actuatorId, TargetAngleDeg * Math.PI / 180.0);
+}
+
+/// <summary>A DC fan (or any speed-controlled DC motor): duty scales the rated speed.</summary>
+public sealed class FanChannel : IPwmChannel
+{
+    private readonly VirtualMcu _mcu;
+    private readonly int _actuatorId;
+    private readonly string _jointName;
+    private readonly double _ratedRevPerSec;
+
+    internal FanChannel(VirtualMcu mcu, string actuatorName, double ratedRevPerSec)
+    {
+        _mcu = mcu;
+        _actuatorId = mcu.Simulator.ActuatorId(actuatorName);
+        _jointName = mcu.Simulator.JointForActuator(_actuatorId);
+        _ratedRevPerSec = ratedRevPerSec;
+    }
+
+    public string JointName => _jointName;
+
+    /// <summary>Drive duty 0..1; the actuator targets duty × rated speed.</summary>
+    public double Duty { get; private set; }
+
+    public double RevPerSec => _mcu.Simulator.GetJointVel(_jointName) / (2.0 * Math.PI);
+
+    public void SetDuty(double duty)
+    {
+        Duty = Math.Clamp(duty, 0.0, 1.0);
+    }
+
+    public void ApplyDuty(double duty) => SetDuty(duty);
+
+    internal void Tick() =>
+        _mcu.Simulator.SetCtrlByIndex(_actuatorId, Duty * _ratedRevPerSec * 2.0 * Math.PI);
+}
+
+/// <summary>
+/// A lumped thermal channel (hotend, heated bed): heater power against Newton
+/// cooling to ambient. Integrated per MCU tick at the physics timestep — the
+/// engine's first non-mechanical state, deterministic like everything else.
+/// Params from the catalog part: heater_power_w, thermal_mass_j_per_k, cooling_w_per_k.
+/// </summary>
+public sealed class ThermalChannel
+{
+    private readonly double _powerWatts;
+    private readonly double _thermalMassJPerK;
+    private readonly double _coolingWPerK;
+    private readonly double _ambientC;
+    private readonly double _dt;
+
+    internal ThermalChannel(string instanceId, double powerWatts, double thermalMassJPerK,
+        double coolingWPerK, double ambientC, double controlPeriod)
+    {
+        InstanceId = instanceId;
+        _powerWatts = powerWatts;
+        _thermalMassJPerK = thermalMassJPerK;
+        _coolingWPerK = coolingWPerK;
+        _ambientC = ambientC;
+        _dt = controlPeriod;
+        TemperatureC = ambientC;
+    }
+
+    public string InstanceId { get; }
+
+    /// <summary>Lump temperature in °C.</summary>
+    public double TemperatureC { get; private set; }
+
+    /// <summary>Heater duty 0..1.</summary>
+    public double Duty { get; private set; }
+
+    public void SetDuty(double duty) => Duty = Math.Clamp(duty, 0.0, 1.0);
+
+    /// <summary>Steady-state temperature at the current duty (for validation tooling).</summary>
+    public double SteadyStateC => _ambientC + Duty * _powerWatts / _coolingWPerK;
+
+    internal void Tick()
+    {
+        var netWatts = Duty * _powerWatts - _coolingWPerK * (TemperatureC - _ambientC);
+        TemperatureC += netWatts / _thermalMassJPerK * _dt;
     }
 }

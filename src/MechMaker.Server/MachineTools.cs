@@ -223,8 +223,31 @@ public static class MachineTools
 
     [McpServerTool(Name = "get_run_status")]
     [Description("Current live-run state: time, per-motor commanded/actual angle, missed steps, " +
-                 "stalls, endstop states.")]
+                 "stalls, endstop states, servo angles, fan speeds, heater temperatures.")]
     public static string GetRunStatus() => Locked(() => W.GetRunStatus());
+
+    [McpServerTool(Name = "set_servo_angle")]
+    [Description("Command a wired servo's target angle in degrees (its duty sweeps the " +
+                 "catalog-declared range; 0 = authored neutral).")]
+    public static string SetServoAngle(
+        [Description("Servo part instance id")] string instanceId,
+        [Description("Target angle in degrees")] double degrees)
+        => Locked(() => W.SetServoAngle(instanceId, degrees));
+
+    [McpServerTool(Name = "set_fan_duty")]
+    [Description("Set a DC fan's drive duty (0..1); the actuator tracks duty × rated rpm.")]
+    public static string SetFanDuty(
+        [Description("Fan part instance id")] string instanceId,
+        [Description("Duty 0..1")] double duty)
+        => Locked(() => W.SetFanDuty(instanceId, duty));
+
+    [McpServerTool(Name = "set_heater_duty")]
+    [Description("Set a heater's duty (0..1) — the lumped thermal model heats the block " +
+                 "toward duty × power / cooling + ambient. Watch it with get_run_status.")]
+    public static string SetHeaterDuty(
+        [Description("Heater part instance id")] string instanceId,
+        [Description("Heater duty 0..1")] double duty)
+        => Locked(() => W.SetHeaterDuty(instanceId, duty));
 
     [McpServerTool(Name = "stop_run")]
     [Description("Stop the live simulation and discard it (machine edits apply to the next run).")]

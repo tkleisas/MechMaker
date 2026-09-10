@@ -39,8 +39,10 @@ public sealed class KlipperMcu
         ("set_next_step_dir", "set_next_step_dir oid=%c dir=%c"),
         ("queue_step", "queue_step oid=%c interval=%u count=%hu add=%hi"),
         ("stepper_get_position", "stepper_get_position oid=%c"),
-        ("endstop_home", "endstop_home oid=%c clock=%u sample_ticks=%u sample_count=%c rest_ticks=%u pin_value=%c"),
-        ("endstop_query_state", "endstop_query_state oid=%c")
+("endstop_home", "endstop_home oid=%c clock=%u sample_ticks=%u sample_count=%c rest_ticks=%u pin_value=%c"),
+        ("endstop_query_state", "endstop_query_state oid=%c"),
+        ("config_pwm_out", "config_pwm_out oid=%c pin=%c cycle_ticks=%u value=%hu default_value=%hu max_duration=%u"),
+        ("set_pwm_out", "set_pwm_out pin=%u value=%hu")
     ];
 
     private static readonly (string Name, string Format)[] ResponseDefs =
@@ -70,7 +72,9 @@ public sealed class KlipperMcu
     private static readonly int CmdQueueStep = CommandIds["queue_step"];
     private static readonly int CmdStepperGetPosition = CommandIds["stepper_get_position"];
     private static readonly int CmdEndstopHome = CommandIds["endstop_home"];
-    private static readonly int CmdEndstopQueryState = CommandIds["endstop_query_state"];
+private static readonly int CmdEndstopQueryState = CommandIds["endstop_query_state"];
+    private static readonly int CmdConfigPwmOut = CommandIds["config_pwm_out"];
+    private static readonly int CmdSetPwmOut = CommandIds["set_pwm_out"];
     private static readonly int RespConfig = ResponseIds["config"];
     private static readonly int RespClock = ResponseIds["clock"];
     private static readonly int RespStepperPosition = ResponseIds["stepper_position"];
@@ -84,7 +88,9 @@ public sealed class KlipperMcu
     private readonly Queue<byte[]> _outgoing = new();
     private readonly Dictionary<int, StepperChannel> _steppersByOid = new();
     private readonly Dictionary<int, EndstopBinding> _endstopsByOid = new();
-    private readonly Dictionary<string, StepperChannel> _steppersByPin = new();
+private readonly Dictionary<string, StepperChannel> _steppersByPin = new();
+    private readonly Dictionary<string, IPwmChannel> _pwmByPin = new();
+    private readonly Dictionary<int, IPwmChannel> _pwmByOid = new();
     private readonly List<string> _pinOrder = [];
 
     private int _oidCount = -1;
@@ -103,12 +109,21 @@ public sealed class KlipperMcu
 
     // ---------- physical bindings (the digital twin's wiring) ----------
 
-    /// <summary>Names a stepper channel for the pin enumeration ("motor_left" etc.).
+/// <summary>Names a stepper channel for the pin enumeration ("motor_left" etc.).
     /// The host resolves the enum int from the data dictionary and uses it in
     /// config_stepper's step_pin/dir_pin parameters.</summary>
     public void NameStepperPin(string pinName, StepperChannel channel)
     {
         _steppersByPin[pinName] = channel;
+        if (!_pinOrder.Contains(pinName))
+            _pinOrder.Add(pinName);
+    }
+
+    /// <summary>Names a PWM channel (servo/fan instance) for the pin enumeration, so
+    /// config_pwm_out / set_pwm_out can address it.</summary>
+    public void NamePwmPin(string pinName, IPwmChannel channel)
+    {
+        _pwmByPin[pinName] = channel;
         if (!_pinOrder.Contains(pinName))
             _pinOrder.Add(pinName);
     }
@@ -247,8 +262,26 @@ if (id == CmdIdentify) HandleIdentify(args);
         else if (id == CmdStepperGetPosition) HandleStepperGetPosition(args);
         else if (id == CmdEndstopHome) HandleEndstopHome(args);
 else if (id == CmdEndstopQueryState) HandleEndstopQueryState(args);
+        else if (id == CmdConfigPwmOut) HandleConfigPwmOut(args);
+        else if (id == CmdSetPwmOut) HandleSetPwmOut(args);
         else throw new InvalidOperationException($"Unknown command id {id}.");
     }
+
+    /// <summary>config_pwm_out: binds a pwm channel (servo/fan instance pin) to an oid
+    /// and applies its initial value (0-255 → duty).</summary>
+    private void HandleConfigPwmOut(List<long> args)
+    {
+        if (_configured) throw new InvalidOperationException("config_pwm_out after finalize_config.");
+        var oid = (int)args[0];
+        var channel = _pwmByPin[PinName(args[1])];
+        _pwmByOid[oid] = channel;
+        channel.ApplyDuty(args[3] / 255.0);
+    }
+
+    /// <summary>set_pwm_out is immediate (a startup command in real klipper); the
+    /// scheduled variant (queue_pwm_out) is a documented TODO.</summary>
+    private void HandleSetPwmOut(List<long> args) =>
+        _pwmByPin[PinName(args[0])].ApplyDuty(args[1] / 255.0);
 
     private StepperChannel ChannelOf(long oid) =>
         _steppersByOid.TryGetValue(checked((int)oid), out var channel)

@@ -1,0 +1,36 @@
+{
+  "id": "sg90_servo",
+  "name": "SG90 micro servo (9 g)",
+  "category": "motor",
+  "description": "9 g hobby servo, ~1.8 kg·cm torque, 180° range (-90..+90 about the authored neutral). Wire its 'pwm' signal to the board; duty 0..1 sweeps the angle range.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.009,
+      "shapes": [
+        { "kind": "box", "extents": [0.0116, 0.0225, 0.0114], "rgba": "0.1 0.1 0.12 1" }
+      ]
+    },
+    {
+      "name": "horn",
+      "parent_body": "root",
+      "relative_pose": { "pos": [0.0055, 0, 0.0114] },
+      "mass_kg": 0.004,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.0045, 0.0025, 0], "rgba": "0.85 0.85 0.85 1" }
+      ],
+      "actuated": "hinge"
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, -0.0114], "rot": [180, 0, 0] } },
+    { "name": "horn_tip", "type": "bolt_m3", "body": "horn", "pose": { "pos": [0, 0, 0.0025] } }
+  ],
+  "params": { "min_angle_deg": -90, "max_angle_deg": 90, "servo_kp": 0.15, "servo_kv": 0.002 },
+  "motor": {
+    "kind": "servo",
+    "holding_torque_nm": 0.18,
+    "rated_current_a": 0.7,
+    "max_speed_rps": 2
+  }
+}

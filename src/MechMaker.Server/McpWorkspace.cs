@@ -299,17 +299,26 @@ public sealed class McpWorkspace : IDisposable
         StartRun();
         _klipperHostSeq = 0;
         _klipper = new KlipperMcu(_run!);
-        foreach (var stepper in _run!.Mcu.Steppers)
-            _klipper.NameStepperPin(StepperInstanceName(stepper), stepper);
+        foreach (var (instanceId, stepper) in _run!.SteppersByInstance)
+            _klipper.NameStepperPin(instanceId, stepper);
+        foreach (var (instanceId, servo) in _run.ServosByInstance)
+            _klipper.NamePwmPin(instanceId, servo);
+        foreach (var (instanceId, fan) in _run.FansByInstance)
+            _klipper.NamePwmPin(instanceId, fan);
         foreach (var spec in _endstopSpecs)
             _klipper.RegisterEndstopPin($"endstop_{spec.JointName}", spec.JointName, spec.TriggerPosition);
         return "Klipper MCU connected. Pin enumerations: " +
-               string.Join(", ", _run!.Mcu.Steppers.Select(s => StepperInstanceName(s))) +
+               string.Join(", ", _pinNames()) +
                (_endstopSpecs.Count == 0
                    ? ""
                    : "; endstop pins: " + string.Join(", ", _endstopSpecs.Select(s => $"endstop_{s.JointName}"))) +
                $". MCU clock = physics ticks ({KlipperMcu.ClockFrequency} Hz).";
     }
+
+    private IEnumerable<string> _pinNames() =>
+        _run!.SteppersByInstance.Keys
+            .Concat(_run.ServosByInstance.Keys)
+            .Concat(_run.FansByInstance.Keys);
 
     private static string StepperInstanceName(StepperChannel channel)
         => channel.JointName[2..].Replace("_rotor", "");
@@ -364,6 +373,34 @@ public sealed class McpWorkspace : IDisposable
                       $"{stepper.QueuedSteps} queued, {(stepper.IsEnabled ? "enabled" : "disabled")}");
         }
         return string.Join(Environment.NewLine, lines);
+    }
+
+    // ---------- servo / fan / heater PWM ----------
+
+    public string SetServoAngle(string instanceId, double degrees)
+    {
+        var run = RequireRun();
+        var servo = run.Servo(instanceId);
+        servo.SetTargetAngleDeg(degrees);
+        return $"Servo '{instanceId}' target {servo.TargetAngleDeg:0.#} deg " +
+               $"(range {servo.MinAngleDeg:0.#}..{servo.MaxAngleDeg:0.#}).";
+    }
+
+    public string SetFanDuty(string instanceId, double duty)
+    {
+        var run = RequireRun();
+        var fan = run.Fan(instanceId);
+        fan.SetDuty(duty);
+        return $"Fan '{instanceId}' duty {fan.Duty:0.##} (target {fan.Duty * 6000:0} rpm).";
+    }
+
+    public string SetHeaterDuty(string instanceId, double duty)
+    {
+        var run = RequireRun();
+        var heater = run.Heater(instanceId);
+        heater.SetDuty(duty);
+        return $"Heater '{instanceId}' duty {heater.Duty:0.##} " +
+               $"(steady state {heater.SteadyStateC:0.#} °C).";
     }
 
     // ---------- run mode ----------
@@ -479,6 +516,14 @@ public sealed class McpWorkspace : IDisposable
 
         foreach (var (joint, endstop) in _endstops)
             lines.Add($"endstop {joint}: {(endstop.Pressed ? "PRESSED" : "open")}");
+
+        foreach (var (instanceId, servo) in run.ServosByInstance)
+            lines.Add($"servo {instanceId}: target {servo.TargetAngleDeg:0.#} deg, at {servo.AngleDeg:0.#} deg");
+        foreach (var (instanceId, fan) in run.FansByInstance)
+            lines.Add($"fan {instanceId}: duty {fan.Duty:0.##}, {fan.RevPerSec * 60:0} rpm");
+        foreach (var (instanceId, heater) in run.HeatersByInstance)
+            lines.Add($"heater {instanceId}: duty {heater.Duty:0.##}, {heater.TemperatureC:0.#} °C " +
+                      $"(steady state {heater.SteadyStateC:0.#} °C)");
 
         return string.Join(Environment.NewLine, lines);
     }

@@ -1,0 +1,35 @@
+{
+  "id": "fan_40mm",
+  "name": "40 mm axial fan (12 V)",
+  "category": "tool",
+  "description": "40x40x10 mm brushless fan, 6000 rpm rated. Wire its 'pwm' signal to the board; duty 0..1 scales speed toward the rating. The blades are a spinning body — air is not simulated, rotation is.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.025,
+      "shapes": [
+        { "kind": "box", "extents": [0.02, 0.02, 0.005], "rgba": "0.2 0.2 0.23 1" }
+      ]
+    },
+    {
+      "name": "blades",
+      "parent_body": "root",
+      "relative_pose": { "pos": [0, 0, 0.006] },
+      "mass_kg": 0.008,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.019, 0.002, 0], "rgba": "0.35 0.4 0.45 0.85" }
+      ],
+      "actuated": "hinge"
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, -0.005], "rot": [180, 0, 0] } }
+  ],
+  "params": { "rated_rpm": 6000, "dc_kv": 0.5 },
+  "motor": {
+    "kind": "dc",
+    "holding_torque_nm": 0.005,
+    "rated_current_a": 0.15,
+    "max_speed_rps": 100
+  }
+}

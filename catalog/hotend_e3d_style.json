@@ -1,0 +1,20 @@
+{
+  "id": "hotend_e3d_style",
+  "name": "Hotend (heater block + nozzle)",
+  "category": "tool",
+  "description": "A heater block with cartridge and nozzle in E3D style. Wire its 'heater' signal to the board and drive it with duty 0..1 — a lumped thermal model heats and cools the block (params: heater_power_w, thermal_mass_j_per_k, cooling_w_per_k). Mounts under a bolt head; attach a thermistor in a real rig.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.02,
+      "shapes": [
+        { "kind": "box", "extents": [0.01, 0.01, 0.006], "rgba": "0.75 0.3 0.15 1" },
+        { "kind": "cylinder", "extents": [0.003, 0.008, 0], "relative_pose": { "pos": [0, 0, -0.011], "rot": [180, 0, 0] }, "rgba": "0.8 0.78 0.7 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "mount", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.006], "rot": [180, 0, 0] } }
+  ],
+  "params": { "heater_power_w": 25, "thermal_mass_j_per_k": 15, "cooling_w_per_k": 0.35 }
+}

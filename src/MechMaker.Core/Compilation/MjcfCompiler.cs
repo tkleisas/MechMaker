@@ -321,13 +321,46 @@ public sealed class MjcfCompiler(PartCatalog catalog)
             new XAttribute("armature", Num(definition.Motor?.RotorInertiaKgM2 ?? 0))));
         _drivingJointOf[instanceId] = jointName;
 
-        if (definition.Motor is { } motor)
+        var motor = definition.Motor;
+        if (motor is null)
+            return;
+
+        switch (motor.Kind)
         {
-            var torque = Num(motor.HoldingTorqueNm);
-            _actuatorHost.Add(new XElement("motor",
-                new XAttribute("name", $"a_{instanceId}"),
-                new XAttribute("joint", jointName),
-                new XAttribute("ctrlrange", $"-{torque} {torque}")));
+            case MotorKind.Servo:
+            {
+                // A position servo: ctrl is the target joint angle (radians).
+                var min = definition.Params.GetValueOrDefault("min_angle_deg", -90) * Math.PI / 180.0;
+                var max = definition.Params.GetValueOrDefault("max_angle_deg", 90) * Math.PI / 180.0;
+                _actuatorHost.Add(new XElement("position",
+                    new XAttribute("name", $"a_{instanceId}"),
+                    new XAttribute("joint", jointName),
+                    new XAttribute("kp", Num(definition.Params.GetValueOrDefault("servo_kp", 0.15))),
+                    new XAttribute("kv", Num(definition.Params.GetValueOrDefault("servo_kv", 0.002))),
+                    new XAttribute("ctrlrange", $"{Num(min)} {Num(max)}")));
+                break;
+            }
+            case MotorKind.Dc:
+            {
+                // A speed-controlled DC motor (fan, pump): ctrl is the target velocity.
+                var ratedRpm = definition.Params.GetValueOrDefault("rated_rpm", 6000);
+                var maxRadPerSec = ratedRpm / 60.0 * 2 * Math.PI;
+                _actuatorHost.Add(new XElement("velocity",
+                    new XAttribute("name", $"a_{instanceId}"),
+                    new XAttribute("joint", jointName),
+                    new XAttribute("kv", Num(definition.Params.GetValueOrDefault("dc_kv", 0.001))),
+                    new XAttribute("ctrlrange", $"0 {Num(maxRadPerSec)}")));
+                break;
+            }
+            default:
+            {
+                var torque = Num(motor.HoldingTorqueNm);
+                _actuatorHost.Add(new XElement("motor",
+                    new XAttribute("name", $"a_{instanceId}"),
+                    new XAttribute("joint", jointName),
+                    new XAttribute("ctrlrange", $"-{torque} {torque}")));
+                break;
+            }
         }
     }
 
