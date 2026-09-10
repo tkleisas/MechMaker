@@ -28,7 +28,7 @@ public class McpWorkspaceTests : IDisposable
     [Fact]
     public void Catalog_discovers_the_repo_seed_parts()
     {
-        Assert.Equal(16, _w.Catalog.All.Count);
+        Assert.Equal(17, _w.Catalog.All.Count);
         Assert.NotNull(_w.Catalog.Find("nema17_stepper"));
         Assert.NotNull(_w.Catalog.Find("gt2_belt_400"));
     }
@@ -440,4 +440,5 @@ public class McpWorkspaceTests : IDisposable
         Assert.Contains("2 stepper channel(s)", startMessage);
     }
 }
+
 

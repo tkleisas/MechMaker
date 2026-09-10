@@ -3,6 +3,7 @@ using MechMaker.Core;
 using MechMaker.Core.Validation;
 using MechMaker.Engine;
 using MechMaker.Engine.Scripting;
+using MechMaker.Hil;
 using ModelContextProtocol.Server;
 
 namespace MechMaker.Server;
@@ -248,6 +249,82 @@ public static class MachineTools
         [Description("Heater part instance id")] string instanceId,
         [Description("Heater duty 0..1")] double duty)
         => Locked(() => W.SetHeaterDuty(instanceId, duty));
+
+    // ---------- HIL: Android emulator + vision (M6) ----------
+
+    [McpServerTool(Name = "hil_connect")]
+    [Description("Pair the machine's android_phone part with an emulator. Transport 'fake' " +
+                 "renders synthetic screens (offline/tests); 'adb' drives a live emulator " +
+                 "(ANDROID_ADB/ANDROID_SERIAL env or explicit paths). Touch actions take " +
+                 "screen fractions [0..1], like androidtester's touch.tap.")]
+    public static string HilConnect(
+        [Description("'fake' for the synthetic emulator, 'adb' for a live one")] string transport = "fake",
+        [Description("Path to adb (adb transport only)")] string? adbPath = null,
+        [Description("Emulator serial (adb transport only, default emulator-5554)")] string? adbSerial = null)
+        => Locked(() => W.HilConnect(transport, adbPath, adbSerial));
+
+    [McpServerTool(Name = "touch_tap")]
+    [Description("Tap the phone screen at a fraction position [0..1]² (origin top-left) — " +
+                 "dispatched to the emulator over adb/fake transport. Find positions with screen_find.")]
+    public static string TouchTap(
+        [Description("Fraction X across the screen")] double fx,
+        [Description("Fraction Y down the screen")] double fy)
+        => Locked(() => W.TouchTap(fx, fy));
+
+    [McpServerTool(Name = "touch_swipe")]
+    [Description("Swipe between two screen fractions over a duration (ms).")]
+    public static string TouchSwipe(
+        [Description("Start fraction X")] double fx1,
+        [Description("Start fraction Y")] double fy1,
+        [Description("End fraction X")] double fx2,
+        [Description("End fraction Y")] double fy2,
+        [Description("Swipe duration in milliseconds")] int durationMs = 300)
+        => Locked(() => W.TouchSwipe(fx1, fy1, fx2, fy2, durationMs));
+
+    [McpServerTool(Name = "screen_find")]
+    [Description("Vision: find a UI element by template image on the emulator's current screen " +
+                 "(OpenCV CCOEFF_NORMED matching). Returns fraction coords + confidence + " +
+                 "phone-local mm — tap the fractions with touch_tap. Capture templates from " +
+                 "screen_screencaps with screen_extract_template.")]
+    public static string ScreenFind(
+        [Description("Element name for the report")] string name,
+        [Description("Path to the template PNG (a crop of a previous screencap)")] string templatePath,
+        [Description("Match confidence threshold (default 0.8)")] double threshold = 0.8)
+        => Locked(() => W.ScreenFind(name, templatePath, threshold));
+
+    [McpServerTool(Name = "screen_wait_for")]
+    [Description("Poll the screen until a template appears (or the timeout expires) — " +
+                 "androidtester's screen.wait_for.")]
+    public static string ScreenWaitFor(
+        [Description("Element name for the report")] string name,
+        [Description("Template PNG path")] string templatePath,
+        [Description("Timeout in seconds")] double timeoutS,
+        [Description("Poll interval in seconds (default 0.5)")] double pollS = 0.5,
+        [Description("Match confidence threshold (default 0.8)")] double threshold = 0.8)
+        => Locked(() => W.ScreenWaitFor(name, templatePath, timeoutS, pollS, threshold));
+
+    [McpServerTool(Name = "screen_screencap")]
+    [Description("Capture the emulator screen as a PNG (writes a file when a path is given).")]
+    public static string ScreenScreencap(
+        [Description("Output PNG path (optional; without it only the byte count is reported)")] string? outputPath = null)
+        => Locked(() => W.ScreenScreencap(outputPath));
+
+    [McpServerTool(Name = "screen_extract_template")]
+    [Description("Cut a template image out of a screencap PNG around a fraction position — " +
+                 "the crop becomes the template for screen_find/screen_wait_for.")]
+    public static string ScreenExtractTemplate(
+        [Description("Screencap PNG path to crop from")] string screencapPath,
+        [Description("Fraction X of the element centre")] double fx,
+        [Description("Fraction Y of the element centre")] double fy,
+        [Description("Half-size of the crop in pixels (default 60)")] int halfSizePx = 60,
+        [Description("Output template PNG path")] string outputPath = "template.png")
+        => Locked(() =>
+        {
+            var png = File.ReadAllBytes(Path.GetFullPath(screencapPath));
+            var template = ScreenDetector.ExtractTemplate(png, fx, fy, halfSizePx);
+            File.WriteAllBytes(Path.GetFullPath(outputPath), template);
+            return $"Template {2 * halfSizePx}px around ({fx * 100:0.#}%, {fy * 100:0.#}%) -> '{outputPath}'.";
+        });
 
     [McpServerTool(Name = "stop_run")]
     [Description("Stop the live simulation and discard it (machine edits apply to the next run).")]

@@ -5,6 +5,7 @@ using MechMaker.Core.Validation;
 using MechMaker.Engine;
 using MechMaker.Engine.Klipper;
 using MechMaker.Engine.Scripting;
+using MechMaker.Hil;
 
 namespace MechMaker.Server;
 
@@ -402,6 +403,96 @@ public sealed class McpWorkspace : IDisposable
         return $"Heater '{instanceId}' duty {heater.Duty:0.##} " +
                $"(steady state {heater.SteadyStateC:0.#} °C).";
     }
+
+    // ---------- HIL (Android emulator + vision) ----------
+
+    private HilSession? _hil;
+
+    /// <summary>Connects a HIL session over a fake emulator (tests/offline) or adb.</summary>
+    public string HilConnect(string transport = "fake", string? adbPath = null, string? adbSerial = null)
+    {
+        IEmulatorTransport emulator = transport.ToLowerInvariant() switch
+        {
+            "fake" => new FakeEmulatorTransport(),
+            "adb" => new AdbEmulatorTransport(
+                adbPath ?? Environment.GetEnvironmentVariable("ANDROID_ADB") ?? "adb",
+                adbSerial ?? Environment.GetEnvironmentVariable("ANDROID_SERIAL") ?? "emulator-5554",
+                ResolvePhoneResolution()),
+            _ => throw new ArgumentException($"Unknown transport '{transport}' (use 'fake' or 'adb').")
+        };
+        return HilConnect(emulator);
+    }
+
+    /// <summary>Connects with a caller-built transport (the test seam).</summary>
+    public string HilConnect(IEmulatorTransport transport)
+    {
+        _hil = HilSession.Connect(transport, _machine, Catalog);
+        return _hil.ToString()!;
+    }
+
+    private (int X, int Y) ResolvePhoneResolution()
+    {
+        var phone = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "android_phone")
+            ?? throw new InvalidOperationException("No android_phone part in the machine.");
+        var definition = Catalog.Get(phone.Part);
+        return ((int)definition.Params.GetValueOrDefault("resolution_x", 540),
+                (int)definition.Params.GetValueOrDefault("resolution_y", 1170));
+    }
+
+    public string TouchTap(double fx, double fy)
+    {
+        var hil = RequireHil();
+        hil.Tap(fx, fy);
+        return $"tap at ({fx * 100:0.#}%, {fy * 100:0.#}%) dispatched to the emulator.";
+    }
+
+    public string TouchSwipe(double fx1, double fy1, double fx2, double fy2, int durationMs)
+    {
+        var hil = RequireHil();
+        hil.Swipe(fx1, fy1, fx2, fy2, durationMs);
+        return $"swipe ({fx1 * 100:0.#}%,{fy1 * 100:0.#}%) -> ({fx2 * 100:0.#}%,{fy2 * 100:0.#}%) " +
+               $"over {durationMs} ms dispatched.";
+    }
+
+    public string ScreenFind(string name, string templatePath, double threshold = ScreenDetector.DefaultThreshold)
+    {
+        var hil = RequireHil();
+        var template = File.ReadAllBytes(Path.GetFullPath(templatePath));
+        var element = hil.Find(name, template, threshold);
+        return element is null
+            ? $"'{name}' not found (threshold {threshold:0.##})."
+            : element + $" — phone-local ({hil.FractionToMmX(element.Fx) * 1000:0.#}, " +
+              $"{hil.FractionToMmY(element.Fy) * 1000:0.#}) mm";
+    }
+
+    public string ScreenWaitFor(string name, string templatePath, double timeoutS, double pollS = 0.5,
+        double threshold = ScreenDetector.DefaultThreshold)
+    {
+        var hil = RequireHil();
+        var template = File.ReadAllBytes(Path.GetFullPath(templatePath));
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutS);
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = hil.Find(name, template, threshold);
+            if (element is not null)
+                return $"'{name}' found: {element}";
+            Thread.Sleep(TimeSpan.FromSeconds(pollS));
+        }
+        return $"'{name}' NOT found within {timeoutS:0.#} s.";
+    }
+
+    public string ScreenScreencap(string? outputPath)
+    {
+        var hil = RequireHil();
+        var png = hil.Transport.Screencap();
+        if (outputPath is null)
+            return $"Captured {png.Length} bytes.";
+        File.WriteAllBytes(Path.GetFullPath(outputPath), png);
+        return $"Captured {png.Length} bytes -> '{Path.GetFullPath(outputPath)}'.";
+    }
+
+    private HilSession RequireHil() =>
+        _hil ?? throw new InvalidOperationException("No HIL session — call hil_connect first.");
 
     // ---------- run mode ----------
 

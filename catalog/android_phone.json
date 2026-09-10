@@ -1,0 +1,24 @@
+{
+  "id": "android_phone",
+  "name": "Android phone (6.7 in, emulator-backed)",
+  "category": "electronics",
+  "description": "A black-slab phone for test rigs: the screen's physical size (68 x 144 mm) maps to the paired emulator's resolution. With a hil session connected, touches on this screen dispatch to the emulator and vision reads its captures.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.17,
+      "shapes": [
+        { "kind": "box", "extents": [0.0355, 0.0755, 0.004], "rgba": "0.08 0.08 0.1 1" }
+      ]
+    }
+  ],
+  "params": {
+    "screen_width_m": 0.068,
+    "screen_height_m": 0.144,
+    "resolution_x": 540,
+    "resolution_y": 1170
+  },
+  "connectors": [
+    { "name": "nest", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.004], "rot": [180, 0, 0] } }
+  ]
+}

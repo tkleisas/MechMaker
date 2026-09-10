@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MechMaker.Engine\MechMaker.Engine.csproj" />
+    <ProjectReference Include="..\MechMaker.Hil\MechMaker.Hil.csproj" />
   </ItemGroup>
 
   <ItemGroup>

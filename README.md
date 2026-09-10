@@ -32,11 +32,11 @@ catalog (parts) ──►  machine.json  ◄── visual builder (primary UI)
 
 What works today:
 
-- **Part catalog** (`catalog/*.json`): 13 seed parts — NEMA 17 stepper (with rotor
-  sub-body), NEMA 17 with integrated T8-8 leadscrew + brass nut (rotation→translation
-  at lead/(2π)), 2020 beam, MGN12 rail + carriage (with belt clamp), GT2 20T pulley,
-  GT2 belt, microswitch endstop, 2020 corner bracket, NEMA 17 mount plate, and
-  20T/40T spur gears (meshed hinge-to-hinge couplers at the pitch-radius ratio).
+- **Part catalog** (`catalog/*.json`): 17 seed parts — NEMA 17 stepper, NEMA 17 with
+  T8-8 leadscrew + brass nut, 2020 beam, MGN12 rail + carriage, GT2 20T pulley,
+  GT2 belt, endstop, corner bracket, mount plate, 20T/40T spur gears, SG90 servo
+  (position actuator), 40 mm DC fan (velocity actuator), hotend (lumped thermal
+  model), and the android_phone HIL device.
 - **Machine format** (`schema/machine.schema.json`): parts, connections, boards, wiring.
 - **Compiler** (`MechMaker.Core`): validates the machine (machine-readable `mmNNN`
   diagnostics) and generates a MuJoCo MJCF model — body tree from welds, slide joints
@@ -72,14 +72,24 @@ What works today:
   data dictionary over identify — so the host role is played by klipper-shaped commands:
   `allocate_oids` → `config_stepper`/`config_endstop` → `finalize_config` →
   `reset_step_clock` → `set_next_step_dir` → `queue_step` → `stepper_get_position`,
-  plus `endstop_home` with move-queue halting on trigger. Steps are full steps on an
-  8 kHz clock; queue_step motion reaches the same closed loop as the velocity path
-  (test-verified: 40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak
-  handling). Exposed to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
+  plus `endstop_home` with move-queue halting on trigger and `config_pwm_out` /
+  `set_pwm_out` for servo/fan channels. Steps are full steps on an 8 kHz clock;
+  queue_step motion reaches the same closed loop as the velocity path (test-verified:
+  40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak handling). Exposed
+  to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
+- **HIL seam — Android emulator + OpenCV** (`MechMaker.Hil`): the machine's
+  `android_phone` part pairs with an emulator (fake transport for tests, live adb for
+  sessions) so the rig's touch actions drive a real Android UI and vision reads the
+  screen — the androidtester/steropes loop, tool by tool: `hil_connect` →
+  `screen_screencap` → `screen_find` / `screen_wait_for` (OpenCV template matching,
+  fraction coordinates like androidtester's `touch.tap {from: [50%, 90%]}`) →
+  `touch_tap` / `touch_swipe`. The live adb transport ships behind the same interface;
+  physics-contact taps (a simulated finger actually pressing the screen) are the
+  next phase.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (171 tests: core math/compile, engine physics, Lua scenarios,
-  klipper wire+protocol, transmission kinematics, server/session).
-- **MCP server** (`MechMaker.Server`): 30 tools over stdio that let LLM agents assemble,
+- **Tests**: `dotnet test` (189 tests: core math/compile, engine physics, Lua scenarios,
+  klipper wire+protocol, PWM components, HIL seam, transmission kinematics, server/session).
+- **MCP server** (`MechMaker.Server`): 40 tools over stdio that let LLM agents assemble,
   wire, validate, compile, and simulate machines — catalog browsing, part placement,
   typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
   compilation, and live closed-loop runs (enable/command motors, add endstops, watch
@@ -114,11 +124,12 @@ The catalog directory is found by walking up from the working directory (or set
 - ~~**M3 — Visual builder**~~ **done**: Avalonia + software 3D viewport; place, snap,
   wire, run (`src/MechMaker.App`).
 - ~~**M4 — MCP server**~~ **done**: LLM agents assemble/wire/validate/simulate machines
-  through 30 tools over stdio (`src/MechMaker.Server`).
+  through 40 tools over stdio (`src/MechMaker.Server`).
 - **M5 — Real Klipper host** on the virtual MCU: **the protocol layer is done** (wire
-  format, data dictionary, queue_step on the live loop, endstop homing). Catalog
-  growth: **leadscrews and gears done**; remaining: servos, fans, hotends; embedding
-  the actual klipper host binary (klippy) against the simulated transport.
+  format, data dictionary, queue_step on the live loop, endstop homing, PWM out).
+  Catalog growth: **leadscrews, gears, servos, fans, hotends done**. Remaining:
+  physics-contact taps on the HIL phone, embedding the actual klipper host binary
+  (klippy) against the simulated transport.
 
 ## Layout
 
@@ -129,9 +140,10 @@ scripts/                 Lua simulation scenarios
 tools/                   mcp_e2e.ps1 — self-checking MCP stdio end-to-end test
 schema/                  machine definition JSON schema
 src/MechMaker.Core       model, validator, MJCF compiler
-src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU
+src/MechMaker.Engine     (M1/M2) MuJoCo runtime + virtual MCU + Lua + Klipper MCU
+src/MechMaker.Hil        (M6) Android emulator + OpenCV seam
 src/MechMaker.Cli        machine.json -> MJCF compiler CLI
-src/MechMaker.Server     (M4/M5) API + MCP host
+src/MechMaker.Server     (M4/M5) MCP host
 src/MechMaker.App        (M3) Avalonia visual builder
 tests/                   xUnit tests
 ```
@@ -139,3 +151,4 @@ tests/                   xUnit tests
 ## License
 
 MIT — do what you want, attribution appreciated.
+
