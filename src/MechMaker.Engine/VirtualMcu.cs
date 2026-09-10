@@ -26,6 +26,13 @@ public sealed class VirtualMcu
     /// of the physics substep the simulator integrates at.</summary>
     public double ControlPeriod { get; }
 
+    /// <summary>The MCU's clock in ticks — one tick per physics step (8 kHz for the
+    /// compiled models). This is the clock Klipper's host schedules steps against.</summary>
+    public long Clock { get; private set; }
+
+    /// <summary>Raised after every control tick (endstop sampling, protocol hooks).</summary>
+    public event Action? PostTick;
+
     public IReadOnlyList<StepperChannel> Steppers => _steppers;
     public IReadOnlyList<EndstopChannel> Endstops => _endstops;
 
@@ -47,10 +54,12 @@ public sealed class VirtualMcu
 
     internal void Tick()
     {
+        Clock++;
         foreach (var stepper in _steppers)
             stepper.Tick();
         foreach (var endstop in _endstops)
             endstop.Tick();
+        PostTick?.Invoke();
     }
 }
 
@@ -113,9 +122,112 @@ public sealed class StepperChannel
     /// instantaneous step to full speed makes a stepper slip, exactly as in hardware.</summary>
     public void SetVelocityRevPerSec(double revPerSec) => TargetVelocityRevPerSec = revPerSec;
 
+    // ---------- Klipper step queue ----------
+    // The protocol-level host interface: queue_step schedules full steps (step pin
+    // pulses) at precise clock times; the magnetic model turns them into torque
+    // exactly as a driver+motor pair would. While a queue exists it replaces the
+    // velocity-ramp path for this channel.
+
+    private sealed class StepRun
+    {
+        public long NextStepClock;
+        public long Interval;
+        public long Add;
+        public int Remaining;
+        public bool Dir;
+    }
+
+    private readonly List<StepRun> _stepQueue = [];
+    private long _nextStepClock;
+    private bool _queueMode;
+    private bool _pendingDir = true;
+
+    /// <summary>Signed full-step position (dir=1 steps minus dir=0 steps) — the
+    /// counter behind klipper's stepper_get_position.</summary>
+    public long SignedStepPosition { get; private set; }
+
+    /// <summary>Full steps currently scheduled in the klipper move queue.</summary>
+    public int QueuedSteps => _stepQueue.Sum(r => r.Remaining);
+
+    /// <summary>Step runs completed since power-on (the MCU's move-queue accounting).</summary>
+    public int CompletedStepRuns { get; private set; }
+
+    public void SetNextStepDir(bool dir) => _pendingDir = dir;
+
+    /// <summary>The next queue_step's first step becomes relative to the given clock
+    /// (the host sends this once at the start of a session).</summary>
+    public void ResetStepClock(long clock)
+    {
+        _nextStepClock = clock;
+        _queueMode = true;
+    }
+
+    /// <summary>
+    /// Appends <paramref name="count"/> steps spaced <paramref name="interval"/> ticks
+    /// apart (adjusted by <paramref name="add"/> after each step), the first one
+    /// <paramref name="interval"/> ticks after the last scheduled step — klipper's
+    /// queue_step semantics.
+    /// </summary>
+    public void QueueStep(long interval, int count, long add)
+    {
+        if (!_queueMode)
+            throw new InvalidOperationException("queue_step before reset_step_clock.");
+        _stepQueue.Add(new StepRun
+        {
+            NextStepClock = _nextStepClock + interval,
+            Interval = interval,
+            Add = add,
+            Remaining = count,
+                Dir = _pendingDir
+            });
+    }
+
+    /// <summary>Clears the queued moves immediately (endstop trigger halting).</summary>
+    public void ClearStepQueue()
+    {
+        _stepQueue.Clear();
+        // The timing reference stays at the last executed step, as klipper does.
+    }
+
+    private void StepOnce(bool dir)
+    {
+        var fullStep = _spec.FullStepRev;
+        CommandedAngleRev += dir ? fullStep : -fullStep;
+        SignedStepPosition += dir ? 1 : -1;
+    }
+
     internal void Tick()
     {
         var sim = _mcu.Simulator;
+        var clock = _mcu.Clock;
+
+        // 0. Klipper step queue: execute every step scheduled at or before this tick.
+        if (_stepQueue.Count > 0)
+        {
+            for (var i = _stepQueue.Count - 1; i >= 0; i--)
+            {
+                var run = _stepQueue[i];
+                while (run.Remaining > 0 && clock >= run.NextStepClock)
+                {
+                    StepOnce(run.Dir);
+                    run.Interval += run.Add;
+                    run.NextStepClock += run.Interval;
+                    run.Remaining--;
+                    _nextStepClock = run.NextStepClock;
+                }
+                if (run.Remaining <= 0)
+                {
+                    _stepQueue.RemoveAt(i);
+                    CompletedStepRuns++;
+                }
+            }
+
+            // Magnetic torque as usual (commanded phase advances in full-step
+            // jumps — classic full-step drive; the rotor interpolates under load).
+            ApplyTorque();
+            BookkeepMissedSteps();
+            return;
+        }
 
         // 1. Ramp the commanded velocity toward the target, then advance the commanded
         //    angle in whole microsteps (quantized, as a real driver does).
@@ -139,8 +251,14 @@ public sealed class StepperChannel
             }
         }
 
-        // 2. Magnetic torque: a sinusoid of the electrical angle error between the
-        //    commanded phase and the rotor, minus winding (back-EMF) losses.
+        ApplyTorque();
+        BookkeepMissedSteps();
+    }
+
+    private void ApplyTorque()
+    {
+        // Magnetic torque: a sinusoid of the electrical angle error between the
+        // commanded phase and the rotor, minus winding (back-EMF) losses.
         double torque = 0;
         if (_enabled)
         {
@@ -149,18 +267,20 @@ public sealed class StepperChannel
             torque = _spec.HoldingTorqueNm * Math.Sin(electricalError)
                      - _spec.BackEmfDamping * 2.0 * Math.PI * RotorVelocityRevPerSec;
         }
-        sim.SetCtrlByIndex(_actuatorId, torque);
+        _mcu.Simulator.SetCtrlByIndex(_actuatorId, torque);
+    }
 
-        // 3. Missed-step bookkeeping: lag beyond 1.5 full steps means lost steps.
-        //    Only meaningful while energized — a disabled rotor is back-driven by
-        //    its load (belts, gravity) and can't "miss" anything.
-        if (_enabled)
-        {
-            var lagSteps = Math.Abs(CommandedAngleRev - RotorAngleRev) / _spec.FullStepRev;
-            var missed = Math.Max(0, (int)Math.Round(lagSteps) - 1);
-            if (missed > MissedSteps)
-                MissedSteps = missed;
-        }
+    private void BookkeepMissedSteps()
+    {
+        // Missed-step bookkeeping: lag beyond 1.5 full steps means lost steps.
+        // Only meaningful while energized — a disabled rotor is back-driven by
+        // its load (belts, gravity) and can't "miss" anything.
+        if (!_enabled)
+            return;
+        var lagSteps = Math.Abs(CommandedAngleRev - RotorAngleRev) / _spec.FullStepRev;
+        var missed = Math.Max(0, (int)Math.Round(lagSteps) - 1);
+        if (missed > MissedSteps)
+            MissedSteps = missed;
     }
 }
 

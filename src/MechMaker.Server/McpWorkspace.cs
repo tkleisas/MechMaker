@@ -3,6 +3,7 @@ using MechMaker.Core.Compilation;
 using MechMaker.Core.Model;
 using MechMaker.Core.Validation;
 using MechMaker.Engine;
+using MechMaker.Engine.Klipper;
 using MechMaker.Engine.Scripting;
 
 namespace MechMaker.Server;
@@ -283,6 +284,88 @@ public sealed class McpWorkspace : IDisposable
         return scenario.Run(simulation).ToString();
     }
 
+    // ---------- Klipper protocol (M5) ----------
+
+    private KlipperMcu? _klipper;
+
+    /// <summary>
+    /// Starts a run with a klipper-protocol MCU endpoint attached. The host
+    /// (agent/test) then runs the klipper flow: identify, allocate_oids,
+    /// config_stepper/config_endstop, finalize_config, queue_step/endstop_home.
+    /// </summary>
+    public string KlipperConnect()
+    {
+        StopRun();
+        StartRun();
+        _klipperHostSeq = 0;
+        _klipper = new KlipperMcu(_run!);
+        foreach (var stepper in _run!.Mcu.Steppers)
+            _klipper.NameStepperPin(StepperInstanceName(stepper), stepper);
+        foreach (var spec in _endstopSpecs)
+            _klipper.RegisterEndstopPin($"endstop_{spec.JointName}", spec.JointName, spec.TriggerPosition);
+        return "Klipper MCU connected. Pin enumerations: " +
+               string.Join(", ", _run!.Mcu.Steppers.Select(s => StepperInstanceName(s))) +
+               (_endstopSpecs.Count == 0
+                   ? ""
+                   : "; endstop pins: " + string.Join(", ", _endstopSpecs.Select(s => $"endstop_{s.JointName}"))) +
+               $". MCU clock = physics ticks ({KlipperMcu.ClockFrequency} Hz).";
+    }
+
+    private static string StepperInstanceName(StepperChannel channel)
+        => channel.JointName[2..].Replace("_rotor", "");
+
+    public string KlipperSend(string command, double[] args)
+    {
+        var klipper = _klipper ?? throw new InvalidOperationException("No klipper session — call klipper_connect first.");
+        var values = args.Select(a => (long)a).ToList();
+        var wire = BuildKlipperBlock(command, values);
+        var outgoing = klipper.Receive(wire);
+        return DescribeKlipperResponses(outgoing);
+    }
+
+    private byte _klipperHostSeq;
+
+    private byte[] BuildKlipperBlock(string command, List<long> values)
+    {
+        var id = command == "identify"
+            ? KlipperMcu.CmdIdentify
+            : KlipperMcu.CommandIds.TryGetValue(command, out var cid)
+                ? cid
+                : throw new KeyNotFoundException($"Unknown klipper command '{command}'. Known: " +
+                    string.Join(", ", KlipperMcu.CommandIds.Keys.OrderBy(k => k)));
+        var block = KlipperWire.Frame(KlipperWire.EncodeVlqAll([id, .. values]), _klipperHostSeq);
+        _klipperHostSeq = (byte)((_klipperHostSeq + 1) & 0x0f);
+        return block;
+    }
+
+    private string DescribeKlipperResponses(List<byte[]> blocks)
+    {
+        var lines = new List<string>();
+        foreach (var block in blocks)
+        {
+            if (block.Length == KlipperWire.MinBlockSize)
+            {
+                lines.Add("ack");
+                continue;
+            }
+            var values = KlipperWire.DecodeVlqAll(block[2..^3]);
+            lines.Add("response " + string.Join(" ", values));
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    public string KlipperStatus()
+    {
+        var klipper = _klipper ?? throw new InvalidOperationException("No klipper session — call klipper_connect first.");
+        var lines = new List<string> { $"clock: {_run!.Mcu.Clock} ticks" };
+        foreach (var stepper in _run.Mcu.Steppers)
+        {
+            lines.Add($"{StepperInstanceName(stepper)}: position {stepper.SignedStepPosition} steps, " +
+                      $"{stepper.QueuedSteps} queued, {(stepper.IsEnabled ? "enabled" : "disabled")}");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
     // ---------- run mode ----------
 
     public string StartRun(int microsteps = 16)
@@ -352,10 +435,14 @@ public sealed class McpWorkspace : IDisposable
     public string StopRun()
     {
         if (_run is null)
+        {
+            _klipper = null;
             return "No run active.";
+        }
         var time = _run.Simulator.Time;
         _run.Dispose();
         _run = null;
+        _klipper = null;
         _endstops.Clear();
         return $"Run stopped at t={time:0.###} s.";
     }

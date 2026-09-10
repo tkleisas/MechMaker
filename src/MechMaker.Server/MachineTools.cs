@@ -237,6 +237,32 @@ public static class MachineTools
                  "(deterministic scripted simulations: drive motors, watch endstops, detect stalls).")]
     public static string GetScenarioApi() => LuaScenario.ApiDoc;
 
+    // ---------- Klipper protocol (M5) ----------
+
+    [McpServerTool(Name = "klipper_connect")]
+    [Description("Start a run with a klipper-protocol MCU endpoint attached. Returns the pin " +
+                 "enumerations (stepper instance ids, endstop pins). Then send klipper MCU " +
+                 "commands with klipper_send: identify, allocate_oids, config_stepper, " +
+                 "config_endstop, endstop_set_stepper, finalize_config, reset_step_clock, " +
+                 "set_next_step_dir, queue_step, stepper_get_position, endstop_home.")]
+    public static string KlipperConnect() => Locked(() => W.KlipperConnect());
+
+    [McpServerTool(Name = "klipper_send")]
+    [Description("Send a klipper MCU command to the connected simulated board (encoded on the real " +
+                 "wire format). Typical flow: allocate_oids(count) → config_stepper(oid, step_pin, " +
+                 "dir_pin, invert_step, step_pulse_ticks) → config_endstop(oid, pin, pull_up) → " +
+                 "endstop_set_stepper(oid, stepper_oid) → finalize_config(crc) → reset_step_clock(oid, " +
+                 "clock) → set_next_step_dir(oid, dir) → queue_step(oid, interval, count, add). " +
+                 "Returns the ack and any response as decoded VLQ integers.")]
+    public static string KlipperSend(
+        [Description("Command name, e.g. 'queue_step' ('identify' also accepted)")] string command,
+        [Description("Integer arguments in order, e.g. [0, 40, 200, 0]")] double[] args)
+        => Locked(() => W.KlipperSend(command, args));
+
+    [McpServerTool(Name = "klipper_status")]
+    [Description("Klipper session state: MCU clock, per-stepper signed step position, queued steps.")]
+    public static string KlipperStatus() => Locked(() => W.KlipperStatus());
+
     [McpServerTool(Name = "run_scenario_source")]
     [Description("Run a Lua scenario against the session machine. The script must define " +
                  "`function run(sim) ... end`; call sim.run(seconds) to advance, sim.enable / " +

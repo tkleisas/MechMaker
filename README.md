@@ -28,7 +28,7 @@ catalog (parts) ──►  machine.json  ◄── visual builder (primary UI)
 - Validation output is a structured report (stall margins, belt ratios, unconnected
   connectors, BOM) — machine-readable for CI and LLMs, readable for humans.
 
-## Status — M3 (visual builder), pre-alpha
+## Status — M5 (Klipper host), pre-alpha
 
 What works today:
 
@@ -64,10 +64,19 @@ What works today:
   scripted simulations — the script plays the host role (drive motors, watch endstops,
   detect stalls) like the C# tests, but authored at runtime. `scripts/axis_home.lua`
   homes the example axis. Run from the app ("Run Script…"), the MCP server, or tests.
+- **Klipper MCU protocol** (`MechMaker.Engine.Klipper`): the virtual MCU speaks the real
+  klipper wire format — VLQ integers, CRC16-CCITT blocks, ack/nak sequencing, zlib
+  data dictionary over identify — so the host role is played by klipper-shaped commands:
+  `allocate_oids` → `config_stepper`/`config_endstop` → `finalize_config` →
+  `reset_step_clock` → `set_next_step_dir` → `queue_step` → `stepper_get_position`,
+  plus `endstop_home` with move-queue halting on trigger. Steps are full steps on an
+  8 kHz clock; queue_step motion reaches the same closed loop as the velocity path
+  (test-verified: 40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak
+  handling). Exposed to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (109 tests: core math/compile, engine physics, Lua scenarios,
-  server/session).
-- **MCP server** (`MechMaker.Server`): 27 tools over stdio that let LLM agents assemble,
+- **Tests**: `dotnet test` (168 tests: core math/compile, engine physics, Lua scenarios,
+  klipper wire+protocol, server/session).
+- **MCP server** (`MechMaker.Server`): 30 tools over stdio that let LLM agents assemble,
   wire, validate, compile, and simulate machines — catalog browsing, part placement,
   typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
   compilation, and live closed-loop runs (enable/command motors, add endstops, watch
@@ -102,11 +111,11 @@ The catalog directory is found by walking up from the working directory (or set
 - ~~**M3 — Visual builder**~~ **done**: Avalonia + software 3D viewport; place, snap,
   wire, run (`src/MechMaker.App`).
 - ~~**M4 — MCP server**~~ **done**: LLM agents assemble/wire/validate/simulate machines
-  through 27 tools over stdio (`src/MechMaker.Server`).
-- **M5 — Real Klipper host** on the virtual MCU (host sends step commands over the
-  Klipper MCU protocol instead of velocity targets); catalog growth (leadscrews,
-  servos, gears, fans, hotends...). The Lua scenario runner is the first taste of
-  M5's "homing scenarios on the closed loop".
+  through 30 tools over stdio (`src/MechMaker.Server`).
+- **M5 — Real Klipper host** on the virtual MCU: **the protocol layer is done** (wire
+  format, data dictionary, queue_step on the live loop, endstop homing). Remaining:
+  embedding the actual klipper host binary (klippy) against the simulated transport,
+  and catalog growth (leadscrews, servos, gears, fans, hotends).
 
 ## Layout
 
