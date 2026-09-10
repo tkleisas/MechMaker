@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1",
+  "name": "leadscrew_z_axis",
+  "description": "Minimal leadscrew axis: a NEMA 17 with an integrated T8-8 screw drives a brass nut (8 mm of travel per revolution). The classic Z axis of a 3D printer, in miniature.",
+  "parts": [
+    { "id": "base", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } },
+    { "id": "motor_plate", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "z_motor", "part": "nema17_leadscrew_t8", "pose": {} },
+    { "id": "z_nut", "part": "leadscrew_nut_t8", "pose": {} }
+  ],
+  "connections": [
+    { "id": "plate_on_base", "part_a": "base", "connector_a": "end_a", "part_b": "motor_plate", "connector_b": "tslot" },
+    { "id": "motor_on_plate", "part_a": "motor_plate", "connector_a": "motor_face", "part_b": "z_motor", "connector_b": "mount" },
+    { "id": "nut_on_screw", "part_a": "z_motor", "connector_a": "screw", "part_b": "z_nut", "connector_b": "thread" }
+  ],
+  "boards": [
+    { "id": "main", "type": "skr-pico" }
+  ],
+  "wiring": [
+    { "component": "z_motor", "signal": "step", "board": "main", "pin": "P2_2" },
+    { "component": "z_motor", "signal": "dir", "board": "main", "pin": "P2_6" },
+    { "component": "z_motor", "signal": "enable", "board": "main", "pin": "P2_1" }
+  ]
+}

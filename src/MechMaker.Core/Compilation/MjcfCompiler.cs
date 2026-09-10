@@ -65,6 +65,8 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         CreateDocument(machine);
         BuildTree(machine);
         EmitBelts(machine);
+        EmitScrews(machine);
+        EmitGears(machine);
 
         return _document;
     }
@@ -113,7 +115,11 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         var compiled = new HashSet<string>(StringComparer.Ordinal) { root.Id };
         EmitPart(machine, root.Id, ToTransform(root.Pose));
 
-        var structural = machine.Connections.Where(c => !TouchesTransmission(c)).ToList();
+        // Gear meshes do not attach parts (both gears mount via their own connections);
+        // they only contribute a ratio coupler, emitted in EmitGears.
+        var structural = machine.Connections
+            .Where(c => !TouchesTransmission(c) && InferConnectionKind(machine, c) != JointKind.Gear)
+            .ToList();
         var deferred = new List<Connection>();
 
         bool progress = true;
@@ -196,10 +202,17 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         }
 
         // A child mating onto an actuated parent body (motor rotor) spins with it;
-        // otherwise hinge/slide children get their own joint.
+        // otherwise hinge/slide children get their own joint. Exceptions:
+        //  - Screw: the nut slides along the screw even though the screw spins,
+        //  - Gear: no joint at all — the mesh is a coupler between mounted gears.
         var parentBodyDef = parentDef.Bodies.First(b => b.Name == parentConnector.Body);
         var parentIsActuated = parentBodyDef.Actuated != JointActuation.None;
-        var childGetsJoint = !parentIsActuated && jointKind is JointKind.Hinge or JointKind.Slide;
+        var childGetsJoint = jointKind switch
+        {
+            JointKind.Screw => true,
+            JointKind.Gear => false,
+            _ => !parentIsActuated && jointKind is JointKind.Hinge or JointKind.Slide
+        };
 
         var relative = parentBodyWorld.Inverse() * childRootWorld;
         var childElement = new XElement("body", new XAttribute("name", childInst));
@@ -207,7 +220,7 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         _bodyElement[parentBodyKey].Add(childElement);
 
         Vec3 jointAxisLocal = Vec3.UnitZ;
-        if (jointKind == JointKind.Slide)
+        if (jointKind == JointKind.Slide || jointKind == JointKind.Screw)
         {
             var axisWorld = parentConnectorWorld.Rotation.Rotate(parentConnector.Axis.Normalized());
             var childWorldRotation = parentBodyWorld.Rotation * relative.Rotation;
@@ -216,7 +229,9 @@ public sealed class MjcfCompiler(PartCatalog catalog)
 
         EmitPart(machine, childInst, childRootWorld, childElement, relative, jointKind, childGetsJoint, jointAxisLocal);
 
-        if (parentIsActuated && _drivingJointOf.TryGetValue(parentInst, out var parentJoint))
+        // A child mating onto an actuated parent body spins with it — but only when the
+        // child has no joint of its own (a nut on a screw keeps its slide joint).
+        if (parentIsActuated && !childGetsJoint && _drivingJointOf.TryGetValue(parentInst, out var parentJoint))
             _drivingJointOf[childInst] = parentJoint;
     }
 
@@ -280,7 +295,7 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         {
             rootElement.Add(new XElement("joint",
                 new XAttribute("name", $"j_{instanceId}"),
-                new XAttribute("type", jointKind == JointKind.Slide ? "slide" : "hinge"),
+                new XAttribute("type", jointKind is JointKind.Slide or JointKind.Screw ? "slide" : "hinge"),
                 new XAttribute("axis", Vec(jointAxisLocal == default ? Vec3.UnitZ : jointAxisLocal)),
                 new XAttribute("pos", "0 0 0"),
                 new XAttribute("limited", "false")));
@@ -414,6 +429,100 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         _report.Add("mm033", Severity.Info,
             $"Belt '{beltId}': '{clampedInstance}' rides the belt ({Math.Abs(metersPerRadian) * 1000 * 2 * Math.PI:0.##} mm per pulley revolution).",
             beltId);
+    }
+
+    // ---------- screws & gears ----------
+
+    /// <summary>
+    /// A nut rides its screw: the nut's slide joint is coupled to the motor rotor's
+    /// hinge at lead/(2π) metres per radian. The lead (mm per revolution) comes from
+    /// the screw part's 'lead_mm' param; direction override via the nut's 'nut_sign'.
+    /// </summary>
+    private void EmitScrews(MachineDefinition machine)
+    {
+        foreach (var connection in machine.Connections)
+        {
+            if (InferConnectionKind(machine, connection) != JointKind.Screw)
+                continue;
+
+            var connectorA = FindConnector(_definitionOf[connection.PartA], connection.ConnectorA, connection, connection.PartA);
+            var screwInst = connectorA.Type == ConnectorType.ScrewT8 ? connection.PartA : connection.PartB;
+            var nutInst = screwInst == connection.PartA ? connection.PartB : connection.PartA;
+
+            if (!_drivingJointOf.TryGetValue(screwInst, out var rotorJoint) ||
+                !_drivingJointOf.TryGetValue(nutInst, out var nutJoint))
+            {
+                _report.AddWarning("mm028",
+                    $"Leadscrew connection '{connection.Id}': screw or nut has no driving joint; no coupler emitted.",
+                    connection.Id);
+                continue;
+            }
+
+            var screwDef = _definitionOf[screwInst];
+            if (!screwDef.Params.TryGetValue("lead_mm", out var leadMm))
+                throw new MjcfCompileException(Error("mm035",
+                    $"Screw '{screwInst}' (catalog '{screwDef.Id}') is missing the 'lead_mm' param.", connection.Id));
+
+            var nutDef = _definitionOf[nutInst];
+            var sign = nutDef.Params.GetValueOrDefault("nut_sign", 1);
+            var metersPerRadian = -sign * leadMm / 1000.0 / (2.0 * Math.PI);
+            _equalityHost.Add(new XElement("joint",
+                new XAttribute("name", $"eq_screw_{connection.Id}"),
+                new XAttribute("joint1", nutJoint),
+                new XAttribute("joint2", rotorJoint),
+                new XAttribute("solref", "0.002 1"),
+                new XAttribute("solimp", "0.95 0.99 0.001"),
+                new XAttribute("polycoef", $"0 {Num(metersPerRadian)} 0 0 0")));
+            _report.Add("mm037", Severity.Info,
+                $"Leadscrew '{connection.Id}': '{nutInst}' rides '{screwInst}' at {leadMm:0.##} mm per revolution.",
+                connection.Id);
+        }
+    }
+
+    /// <summary>
+    /// Two meshed spur gears: their driving joints are coupled at the radius ratio
+    /// (linear speed at the mesh is shared; world directions oppose, and the mating
+    /// frames are mirrored, so the joint coordinates share sign).
+    /// </summary>
+    private void EmitGears(MachineDefinition machine)
+    {
+        foreach (var connection in machine.Connections)
+        {
+            if (InferConnectionKind(machine, connection) != JointKind.Gear)
+                continue;
+
+            if (!_drivingJointOf.TryGetValue(connection.PartA, out var jointA) ||
+                !_drivingJointOf.TryGetValue(connection.PartB, out var jointB))
+            {
+                _report.AddWarning("mm028",
+                    $"Gear mesh '{connection.Id}': one or both gears have no driving joint; no coupler emitted.",
+                    connection.Id);
+                continue;
+            }
+
+            var radiusA = GearRadius(connection, _definitionOf[connection.PartA], connection.PartA);
+            var radiusB = GearRadius(connection, _definitionOf[connection.PartB], connection.PartB);
+            var ratio = radiusB / radiusA; // jointA turns ratio× jointB (shared mesh speed)
+            _equalityHost.Add(new XElement("joint",
+                new XAttribute("name", $"eq_gear_{connection.Id}"),
+                new XAttribute("joint1", jointA),
+                new XAttribute("joint2", jointB),
+                new XAttribute("solref", "0.002 1"),
+                new XAttribute("solimp", "0.95 0.99 0.001"),
+                new XAttribute("polycoef", $"0 {Num(ratio)} 0 0 0")));
+            _report.Add("mm038", Severity.Info,
+                $"Gear mesh '{connection.Id}': {connection.PartA} ({radiusA * 1000:0.##} mm) " +
+                $"meshed to {connection.PartB} ({radiusB * 1000:0.##} mm), ratio {ratio:0.###}.",
+                connection.Id);
+        }
+    }
+
+    private double GearRadius(Connection connection, PartDefinition definition, string instanceId)
+    {
+        if (!definition.Params.TryGetValue("pitch_radius", out var radius))
+            throw new MjcfCompileException(Error("mm036",
+                $"Gear '{instanceId}' (catalog '{definition.Id}') is missing the 'pitch_radius' param.", instanceId));
+        return radius;
     }
 
     private JointKind InferConnectionKind(MachineDefinition machine, Connection connection)

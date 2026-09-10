@@ -1,0 +1,19 @@
+{
+  "id": "leadscrew_nut_t8",
+  "name": "T8 leadscrew nut (brass, flanged)",
+  "category": "linear_motion",
+  "description": "Brass nut for an 8 mm trapezoidal screw, 8 mm lead. Rides the screw (slide along the thread); mount the flange with an M3 bolt to whatever the nut should carry.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.02,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.008, 0.012, 0], "rgba": "0.85 0.75 0.35 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "thread", "type": "nut_t8", "pose": {} },
+    { "name": "mount", "type": "bolt_m3", "pose": { "pos": [0, 0, 0.012] } }
+  ]
+}

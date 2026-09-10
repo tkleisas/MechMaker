@@ -32,15 +32,18 @@ catalog (parts) ──►  machine.json  ◄── visual builder (primary UI)
 
 What works today:
 
-- **Part catalog** (`catalog/*.json`): 10 seed parts — NEMA 17 stepper (with rotor
-  sub-body), 2020 beam, MGN12 rail + carriage (with belt clamp), GT2 20T pulley,
-  GT2 belt, microswitch endstop, 2020 corner bracket, NEMA 17 mount plate.
+- **Part catalog** (`catalog/*.json`): 13 seed parts — NEMA 17 stepper (with rotor
+  sub-body), NEMA 17 with integrated T8-8 leadscrew + brass nut (rotation→translation
+  at lead/(2π)), 2020 beam, MGN12 rail + carriage (with belt clamp), GT2 20T pulley,
+  GT2 belt, microswitch endstop, 2020 corner bracket, NEMA 17 mount plate, and
+  20T/40T spur gears (meshed hinge-to-hinge couplers at the pitch-radius ratio).
 - **Machine format** (`schema/machine.schema.json`): parts, connections, boards, wiring.
 - **Compiler** (`MechMaker.Core`): validates the machine (machine-readable `mmNNN`
   diagnostics) and generates a MuJoCo MJCF model — body tree from welds, slide joints
-  for carriages, hinge joints with torque actuators for motor rotors (with reflected
-  rotor inertia), belt couplers (pulleys mirrored; belt-clamped parts ride the belt
-  at pitch_radius × pulley angle).
+  for carriages and leadscrew nuts, hinge joints with torque actuators for motor rotors
+  (with reflected rotor inertia), belt couplers (pulleys mirrored; belt-clamped parts
+  ride the belt at pitch_radius × pulley angle), leadscrew couplers (nut = lead/(2π)
+  per rotor radian), and gear-mesh couplers (ratio = pitch-radius ratio).
 - **Physics runtime** (`MechMaker.Engine`): native MuJoCo 3.11, 8 kHz fixed timestep,
   bitwise deterministic.
 - **Virtual MCU + stepper model**: one channel per wired motor; commands ramp at an
@@ -74,8 +77,8 @@ What works today:
   (test-verified: 40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak
   handling). Exposed to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (168 tests: core math/compile, engine physics, Lua scenarios,
-  klipper wire+protocol, server/session).
+- **Tests**: `dotnet test` (171 tests: core math/compile, engine physics, Lua scenarios,
+  klipper wire+protocol, transmission kinematics, server/session).
 - **MCP server** (`MechMaker.Server`): 30 tools over stdio that let LLM agents assemble,
   wire, validate, compile, and simulate machines — catalog browsing, part placement,
   typed-connector connections, board wiring, `mmNNN` validation diagnostics, MJCF
@@ -113,9 +116,9 @@ The catalog directory is found by walking up from the working directory (or set
 - ~~**M4 — MCP server**~~ **done**: LLM agents assemble/wire/validate/simulate machines
   through 30 tools over stdio (`src/MechMaker.Server`).
 - **M5 — Real Klipper host** on the virtual MCU: **the protocol layer is done** (wire
-  format, data dictionary, queue_step on the live loop, endstop homing). Remaining:
-  embedding the actual klipper host binary (klippy) against the simulated transport,
-  and catalog growth (leadscrews, servos, gears, fans, hotends).
+  format, data dictionary, queue_step on the live loop, endstop homing). Catalog
+  growth: **leadscrews and gears done**; remaining: servos, fans, hotends; embedding
+  the actual klipper host binary (klippy) against the simulated transport.
 
 ## Layout
 

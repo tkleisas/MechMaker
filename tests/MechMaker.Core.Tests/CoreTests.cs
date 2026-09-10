@@ -27,7 +27,7 @@ public class CatalogTests
     {
         var catalog = TestRepo.Catalog();
 
-        Assert.Equal(9, catalog.All.Count);
+        Assert.Equal(13, catalog.All.Count);
         var motor = catalog.Get("nema17_stepper");
         Assert.NotNull(motor.Motor);
         Assert.Equal(MotorKind.Stepper, motor.Motor!.Kind);

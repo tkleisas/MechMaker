@@ -1,0 +1,34 @@
+{
+  "schema_version": "0.1",
+  "name": "gear_train",
+  "description": "Two motors coupled through meshed spur gears (20T : 40T, module 1): the driven side turns at half speed with twice the torque. The mesh is a kinematic coupler — placement here is schematic.",
+  "parts": [
+    { "id": "base", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } },
+    { "id": "plate_a", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "plate_b", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "motor_a", "part": "nema17_stepper", "pose": {} },
+    { "id": "motor_b", "part": "nema17_stepper", "pose": {} },
+    { "id": "gear_a", "part": "spur_gear_20t", "pose": {} },
+    { "id": "gear_b", "part": "spur_gear_40t", "pose": {} }
+  ],
+  "connections": [
+    { "id": "plate_a_on_base", "part_a": "base", "connector_a": "end_a", "part_b": "plate_a", "connector_b": "tslot" },
+    { "id": "plate_b_on_base", "part_a": "base", "connector_a": "end_b", "part_b": "plate_b", "connector_b": "tslot" },
+    { "id": "motor_a_on_plate", "part_a": "plate_a", "connector_a": "motor_face", "part_b": "motor_a", "connector_b": "mount" },
+    { "id": "motor_b_on_plate", "part_a": "plate_b", "connector_a": "motor_face", "part_b": "motor_b", "connector_b": "mount" },
+    { "id": "gear_a_on_shaft", "part_a": "motor_a", "connector_a": "shaft", "part_b": "gear_a", "connector_b": "bore" },
+    { "id": "gear_b_on_shaft", "part_a": "motor_b", "connector_a": "shaft", "part_b": "gear_b", "connector_b": "bore" },
+    { "id": "gear_mesh", "part_a": "gear_a", "connector_a": "gear", "part_b": "gear_b", "connector_b": "gear" }
+  ],
+  "boards": [
+    { "id": "main", "type": "skr-pico" }
+  ],
+  "wiring": [
+    { "component": "motor_a", "signal": "step", "board": "main", "pin": "P2_2" },
+    { "component": "motor_a", "signal": "dir", "board": "main", "pin": "P2_6" },
+    { "component": "motor_a", "signal": "enable", "board": "main", "pin": "P2_1" },
+    { "component": "motor_b", "signal": "step", "board": "main", "pin": "P6_2" },
+    { "component": "motor_b", "signal": "dir", "board": "main", "pin": "P6_6" },
+    { "component": "motor_b", "signal": "enable", "board": "main", "pin": "P6_1" }
+  ]
+}

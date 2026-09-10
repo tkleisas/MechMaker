@@ -1,0 +1,20 @@
+{
+  "id": "spur_gear_20t",
+  "name": "Spur gear, 20 teeth (mod 1)",
+  "category": "transmission",
+  "description": "20-tooth spur gear, module 1 (20 mm pitch diameter), 5 mm bore. Mesh with another gear's teeth; mount on a 5 mm shaft via the bore.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.015,
+      "shapes": [
+        { "kind": "cylinder", "extents": [0.01, 0.005, 0], "relative_pose": { "rot": [90, 0, 0] }, "rgba": "0.55 0.55 0.6 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "bore", "type": "bore_5mm", "pose": { "pos": [0, 0, 0], "rot": [180, 0, 0] } },
+    { "name": "gear", "type": "gear_teeth", "pose": { "pos": [0, 0.01, 0], "rot": [0, 90, 0] } }
+  ],
+  "params": { "pitch_radius": 0.01, "teeth": 20 }
+}
