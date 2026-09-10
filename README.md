@@ -77,14 +77,16 @@ What works today:
   queue_step motion reaches the same closed loop as the velocity path (test-verified:
   40 mm/rev carriage travel, homing halt at 20 mm, out-of-order nak handling). Exposed
   to agents via `klipper_connect` / `klipper_send` / `klipper_status`.
-- **HIL seam — Android emulator + OpenCV** (`MechMaker.Hil`): the machine's
+- **HIL seam — Android emulator + OpenCV + OCR** (`MechMaker.Hil`): the machine's
   `android_phone` part pairs with an emulator — **live over adb (verified end-to-end
   against a real Android 16 emulator: screencap → template → OpenCV find → tap), with
   a fake transport for offline tests** — so the rig's touch actions drive a real
   Android UI and vision reads the screen, the androidtester/steropes loop, tool by
   tool: `hil_connect` → `screen_screencap` → `screen_find` / `screen_wait_for`
   (OpenCV template matching, fraction coordinates like androidtester's
-  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. **Physics-contact taps are live and scripted**: a
+  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`; **OCR via Tesseract**
+  (`screen_find_text` / `screen_wait_for_text` — androidtester's pluggable OCR:
+  `screen.wait_for {text: ...}`, needs `tools/fetch_tessdata.ps1`). **Physics-contact taps are live and scripted**: a
   `touch_finger` part — androidtester's spring finger as a servo-driven plunger —
   arms over the phone, and commanding its slide servo (`set_finger_position`,
   press −8 mm / retract +2 mm) physically taps the glass; each press dispatches an
@@ -101,10 +103,10 @@ What works today:
   flagship scenario: `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock →
   OCR-style home assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
-- **Tests**: `dotnet test` (195 tests: core math/compile, engine physics, Lua scenarios,
+- **Tests**: `dotnet test` (202 tests: core math/compile, engine physics, Lua scenarios,
   klipper wire+protocol, PWM components, HIL seam + physics taps + tap_at, transmission
   kinematics, server/session).
-- **MCP server** (`MechMaker.Server`): 45 tools over stdio that let LLM agents assemble,
+- **MCP server** (`MechMaker.Server`): 47 tools over stdio that let LLM agents assemble,
   wire, validate, compile, simulate, render, and drive real Android UIs — catalog
   browsing, part placement, typed-connector connections, board wiring, `mmNNN`
   validation diagnostics, MJCF compilation, live closed-loop runs (motors, endstops,

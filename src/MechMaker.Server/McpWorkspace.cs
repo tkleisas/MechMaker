@@ -520,7 +520,7 @@ public string SetServoAngle(string instanceId, double degrees)
         return $"'{name}' NOT found within {timeoutS:0.#} s.";
     }
 
-    public string ScreenScreencap(string? outputPath)
+public string ScreenScreencap(string? outputPath)
     {
         var hil = RequireHil();
         var png = hil.Transport.Screencap();
@@ -528,6 +528,41 @@ public string SetServoAngle(string instanceId, double degrees)
             return $"Captured {png.Length} bytes.";
         File.WriteAllBytes(Path.GetFullPath(outputPath), png);
         return $"Captured {png.Length} bytes -> '{Path.GetFullPath(outputPath)}'.";
+    }
+
+    /// <summary>
+    /// OCR: find a line containing the expected text on the current screen —
+    /// androidtester's `screen.wait_for {text}`. Needs the Tesseract model
+    /// (tools/fetch_tessdata.ps1).
+    /// </summary>
+    public string ScreenFindText(string expected, double minConfidence = 60)
+    {
+        var hil = RequireHil();
+        if (!TextDetector.IsAvailable)
+            throw new InvalidOperationException(
+                "OCR unavailable — fetch the English model with tools/fetch_tessdata.ps1.");
+        var element = TextDetector.FindText(expected, hil.Transport.Screencap(), minConfidence);
+        return element is null
+            ? $"'{expected}' not found (min confidence {minConfidence:0.#})."
+            : element.ToString();
+    }
+
+    public string ScreenWaitForText(string expected, double timeoutS, double pollS = 0.5,
+        double minConfidence = 60)
+    {
+        var hil = RequireHil();
+        if (!TextDetector.IsAvailable)
+            throw new InvalidOperationException(
+                "OCR unavailable — fetch the English model with tools/fetch_tessdata.ps1.");
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutS);
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = TextDetector.FindText(expected, hil.Transport.Screencap(), minConfidence);
+            if (element is not null)
+                return $"'{expected}' found: {element}";
+            Thread.Sleep(TimeSpan.FromSeconds(pollS));
+        }
+        return $"'{expected}' NOT found within {timeoutS:0.#} s.";
     }
 
 private HilSession RequireHil() =>

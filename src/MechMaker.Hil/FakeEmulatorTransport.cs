@@ -17,6 +17,7 @@ public sealed class FakeEmulatorTransport : IEmulatorTransport
     private readonly List<(double Fx, double Fy)> _taps = [];
     private readonly List<(double Fx1, double Fy1, double Fx2, double Fy2, int DurationMs)> _swipes = [];
     private readonly List<(string Name, double Fx, double Fy, int HalfPx)> _apps = [];
+    private readonly List<(string Text, double Fx, double Fy, double HeightPx)> _texts = [];
 
     public FakeEmulatorTransport(int width = DefaultWidth, int height = DefaultHeight)
     {
@@ -50,6 +51,7 @@ public sealed class FakeEmulatorTransport : IEmulatorTransport
             _taps.Clear();
             _swipes.Clear();
             _apps.Clear();
+            _texts.Clear();
             CurrentScreen = "home";
         }
     }
@@ -59,6 +61,14 @@ public sealed class FakeEmulatorTransport : IEmulatorTransport
     {
         lock (_gate)
             _apps.Add((name, fxCentre, fyCentre, halfSizePx));
+    }
+
+    /// <summary>Draws a text label on the current screen (fractions) — the OCR tests'
+    /// fixture. Returns to the home bar rendering underneath.</summary>
+    public void DrawText(string text, double fxCentre, double fyCentre, double heightPx = 48)
+    {
+        lock (_gate)
+            _texts.Add((text, fxCentre, fyCentre, heightPx));
     }
 
     public void Tap(double fx, double fy)
@@ -94,7 +104,7 @@ public sealed class FakeEmulatorTransport : IEmulatorTransport
             Cv2.Rectangle(screen,
                 new Rect(Resolution.X / 4, Resolution.Y - 12, Resolution.X / 2, 8),
                 new Scalar(60, 60, 70), -1);
-            foreach (var (_, fx, fy, half) in _apps)
+foreach (var (_, fx, fy, half) in _apps)
             {
                 var cx = (int)Math.Round(fx * (Resolution.X - 1));
                 var cy = (int)Math.Round(fy * (Resolution.Y - 1));
@@ -106,6 +116,19 @@ public sealed class FakeEmulatorTransport : IEmulatorTransport
                     new Scalar(30, 60, 130), 4);
                 Cv2.Rectangle(screen, new Rect(cx - half / 3, cy - half / 3, half * 2 / 3, half * 2 / 3),
                     new Scalar(240, 240, 250), -1);
+            }
+            foreach (var (text, fx, fy, heightPx) in _texts)
+            {
+                // Dark text on the light background, centred on the fraction —
+                // Tesseract's bread and butter.
+                var scale = heightPx / 22.0;
+                var thickness = Math.Max(2, (int)(heightPx / 24));
+                var size = Cv2.GetTextSize(text, HersheyFonts.HersheySimplex, scale, thickness, out _);
+                var org = new Point(
+                    (int)Math.Round(fx * (Resolution.X - 1) - size.Width / 2.0),
+                    (int)Math.Round(fy * (Resolution.Y - 1) + size.Height / 2.0));
+                Cv2.PutText(screen, text, org, HersheyFonts.HersheySimplex,
+                    scale, new Scalar(30, 30, 40), thickness, LineTypes.AntiAlias);
             }
             Cv2.ImEncode(".png", screen, out var png);
             return png.ToArray();

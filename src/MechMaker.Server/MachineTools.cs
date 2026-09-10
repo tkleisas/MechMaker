@@ -354,6 +354,26 @@ public static class MachineTools
         [Description("Output PNG path (optional; without it only the byte count is reported)")] string? outputPath = null)
         => Locked(() => W.ScreenScreencap(outputPath));
 
+    [McpServerTool(Name = "screen_find_text")]
+    [Description("OCR: find a line containing the expected text on the emulator's current screen " +
+                 "(Tesseract, androidtester's pluggable OCR). Returns the text with its fraction " +
+                 "position — tap it with touch_tap / tap_at. Needs tessdata/eng.traineddata " +
+                 "(tools/fetch_tessdata.ps1).")]
+    public static string ScreenFindText(
+        [Description("Expected text (case-insensitive substring)")] string expected,
+        [Description("Minimum OCR confidence (default 60)")] double minConfidence = 60)
+        => Locked(() => W.ScreenFindText(expected, minConfidence));
+
+    [McpServerTool(Name = "screen_wait_for_text")]
+    [Description("Poll the screen with OCR until the expected text appears (or the timeout " +
+                 "expires) — androidtester's screen.wait_for {text}.")]
+    public static string ScreenWaitForText(
+        [Description("Expected text (case-insensitive substring)")] string expected,
+        [Description("Timeout in seconds")] double timeoutS,
+        [Description("Poll interval in seconds (default 0.5)")] double pollS = 0.5,
+        [Description("Minimum OCR confidence (default 60)")] double minConfidence = 60)
+        => Locked(() => W.ScreenWaitForText(expected, timeoutS, pollS, minConfidence));
+
     [McpServerTool(Name = "screen_extract_template")]
     [Description("Cut a template image out of a screencap PNG around a fraction position — " +
                  "the crop becomes the template for screen_find/screen_wait_for.")]

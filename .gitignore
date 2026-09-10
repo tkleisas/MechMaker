@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 *.swp
 
 out/
+
+# Tesseract language data (fetch with tools/fetch_tessdata.ps1)
+tessdata/
