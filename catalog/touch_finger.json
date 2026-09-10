@@ -2,7 +2,7 @@
   "id": "touch_finger",
   "name": "Conductive touch finger (toolhead)",
   "category": "tool",
-  "description": "The androidtester finger tool: mounts under a plate, arms over on a horizontal arm, and the conductive tip hangs on an unactuated slide (gravity drops it). When the tip presses the android_phone's glass, the HIL bridge dispatches emulator taps at the contact point. Tip rest height tunes the gap to the screen.",
+  "description": "The androidtester finger tool: mounts under a plate, arms over on a horizontal arm, and the conductive tip hangs on a servo-driven slide (the press plunger). Wire its 'pwm' signal and drive duty 0 (press, target -8 mm) .. 1 (retract, +2 mm); each press of the glass dispatches an emulator tap through the HIL bridge. Duty timing sets tap vs long-press.",
   "bodies": [
     {
       "name": "root",
@@ -15,7 +15,7 @@
     {
       "name": "tip",
       "parent_body": "root",
-      "relative_pose": { "pos": [0.1, 0, 0.027] },
+      "relative_pose": { "pos": [0.1, 0, 0.024] },
       "mass_kg": 0.004,
       "shapes": [
         { "kind": "cylinder", "extents": [0.002, 0.006, 0], "relative_pose": { "pos": [0, 0, -0.006], "rot": [180, 0, 0] }, "rgba": "0.9 0.85 0.4 1" }
@@ -26,5 +26,16 @@
   "connectors": [
     { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, 0.006], "rot": [180, 0, 0] } }
   ],
-  "params": { "tip_radius_m": 0.002 }
+  "params": {
+    "min_pos_m": -0.008,
+    "max_pos_m": 0.002,
+    "servo_kp": 80.0,
+    "servo_kv": 0.4
+  },
+  "motor": {
+    "kind": "servo",
+    "holding_torque_nm": 0.18,
+    "rated_current_a": 0.7,
+    "max_speed_rps": 2
+  }
 }

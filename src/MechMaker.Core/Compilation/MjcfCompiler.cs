@@ -329,9 +329,16 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         {
             case MotorKind.Servo:
             {
-                // A position servo: ctrl is the target joint angle (radians).
-                var min = definition.Params.GetValueOrDefault("min_angle_deg", -90) * Math.PI / 180.0;
-                var max = definition.Params.GetValueOrDefault("max_angle_deg", 90) * Math.PI / 180.0;
+                // A position servo: ctrl is the target joint position — radians for
+                // hinges, metres for slides (androidtester's spring finger: a
+                // position-driven plunger).
+                var isSlide = body.Actuated == JointActuation.Slide;
+                var min = isSlide
+                    ? definition.Params.GetValueOrDefault("min_pos_m", 0)
+                    : definition.Params.GetValueOrDefault("min_angle_deg", -90) * Math.PI / 180.0;
+                var max = isSlide
+                    ? definition.Params.GetValueOrDefault("max_pos_m", 0.01)
+                    : definition.Params.GetValueOrDefault("max_angle_deg", 90) * Math.PI / 180.0;
                 _actuatorHost.Add(new XElement("position",
                     new XAttribute("name", $"a_{instanceId}"),
                     new XAttribute("joint", jointName),

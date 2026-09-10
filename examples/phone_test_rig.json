@@ -18,5 +18,7 @@
   "boards": [
     { "id": "main", "type": "skr-pico" }
   ],
-  "wiring": []
+  "wiring": [
+    { "component": "finger", "signal": "pwm", "board": "main", "pin": "P2_2" }
+  ]
 }

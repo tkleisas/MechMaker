@@ -120,7 +120,15 @@ public class HilToolsTests : IDisposable
         _w.StartRun();
         Assert.Contains("armed", _w.ArmPhysicsTaps());
 
+        // Settle at rest, then two commanded press/retract cycles (scripted taps).
+        _w.RunFor(0.02);
+        _w.SetFingerPosition("finger", -0.008);
         _w.RunFor(0.05);
+        _w.SetFingerPosition("finger", 0.002);
+        _w.RunFor(0.05);
+        _w.SetFingerPosition("finger", -0.008);
+        _w.RunFor(0.05);
+
         Assert.Contains("physics taps dispatched", _w.HilStatus());
     }
 }

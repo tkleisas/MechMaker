@@ -378,7 +378,7 @@ public sealed class McpWorkspace : IDisposable
 
     // ---------- servo / fan / heater PWM ----------
 
-    public string SetServoAngle(string instanceId, double degrees)
+public string SetServoAngle(string instanceId, double degrees)
     {
         var run = RequireRun();
         var servo = run.Servo(instanceId);
@@ -386,6 +386,19 @@ public sealed class McpWorkspace : IDisposable
         return $"Servo '{instanceId}' target {servo.TargetAngleDeg:0.#} deg " +
                $"(range {servo.MinAngleDeg:0.#}..{servo.MaxAngleDeg:0.#}).";
     }
+
+    public string SetServoPosition(string instanceId, double metres)
+    {
+        var run = RequireRun();
+        var servo = run.Servo(instanceId);
+        servo.SetTargetPositionM(metres);
+        return $"Slide servo '{instanceId}' target {servo.TargetAngleDeg * 1000:0.#} mm " +
+               $"(range {servo.MinPositionM * 1000:0.#}..{servo.MaxPositionM * 1000:0.#}).";
+    }
+
+    /// <summary>Alias for the MCP tool name (set_finger_position).</summary>
+    public string SetFingerPosition(string instanceId, double metres) =>
+        SetServoPosition(instanceId, metres);
 
     public string SetFanDuty(string instanceId, double duty)
     {

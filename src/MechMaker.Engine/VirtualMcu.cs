@@ -46,10 +46,14 @@ public sealed class VirtualMcu
         return channel;
     }
 
-/// <summary>A hobby/position servo: the position actuator's target angle.</summary>
-    public ServoChannel AddServo(string actuatorName, double minAngleDeg, double maxAngleDeg)
+/// <summary>A hobby/position servo: the position actuator's target. Hinge servos take
+    /// degree ranges; slide servos take metre positions.</summary>
+    public ServoChannel AddServo(string actuatorName, double minAngleDeg, double maxAngleDeg,
+        bool isSlide = false)
     {
-        var channel = new ServoChannel(this, actuatorName, minAngleDeg, maxAngleDeg);
+        var channel = isSlide
+            ? new ServoChannel(this, actuatorName, minAngleDeg, maxAngleDeg, isSlide: true)
+            : new ServoChannel(this, actuatorName, minAngleDeg * Math.PI / 180.0, maxAngleDeg * Math.PI / 180.0, isSlide: false);
         _servos.Add(channel);
         return channel;
     }
@@ -359,49 +363,78 @@ public interface IPwmChannel
 }
 
 /// <summary>A position servo channel: the position actuator's target, written to ctrl
-/// every tick. Duty sweeps the configured angle range (like a real servo driver).</summary>
-public sealed class ServoChannel : IPwmChannel
+    /// every tick. ctrl is stored in SI joint units internally (radians hinge, metres
+    /// slide); the accessors convert for hinges.</summary>
+    public sealed class ServoChannel : IPwmChannel
 {
     private readonly VirtualMcu _mcu;
     private readonly int _actuatorId;
     private readonly string _jointName;
-    private readonly double _minAngleDeg;
-    private readonly double _maxAngleDeg;
+    private readonly double _min;   // SI: radians (hinge) or metres (slide)
+    private readonly double _max;
+    private readonly bool _isSlide;
 
-    internal ServoChannel(VirtualMcu mcu, string actuatorName, double minAngleDeg, double maxAngleDeg)
+    internal ServoChannel(VirtualMcu mcu, string actuatorName, double min, double max, bool isSlide)
     {
         _mcu = mcu;
         _actuatorId = mcu.Simulator.ActuatorId(actuatorName);
         _jointName = mcu.Simulator.JointForActuator(_actuatorId);
-        _minAngleDeg = minAngleDeg;
-        _maxAngleDeg = maxAngleDeg;
+        _min = min;
+        _max = max;
+        _isSlide = isSlide;
     }
 
     /// <summary>The joint this servo positions (e.g. j_servo_arm).</summary>
     public string JointName => _jointName;
 
-    public double MinAngleDeg => _minAngleDeg;
-    public double MaxAngleDeg => _maxAngleDeg;
+    public double MinAngleDeg => _isSlide
+        ? throw new InvalidOperationException("Slide servo: use MinPositionM")
+        : _min * 180.0 / Math.PI;
+    public double MaxAngleDeg => _isSlide
+        ? throw new InvalidOperationException("Slide servo: use MaxPositionM")
+        : _max * 180.0 / Math.PI;
 
-    /// <summary>Commanded target angle in degrees (0 = the authored neutral pose).</summary>
+    /// <summary>Slide-servo travel range in metres (androidtester's press plunger).</summary>
+    public double MinPositionM => _isSlide ? _min : throw new InvalidOperationException("MinPositionM is for slide servos");
+    public double MaxPositionM => _isSlide ? _max : throw new InvalidOperationException("MaxPositionM is for slide servos");
+
+    public bool IsSlide => _isSlide;
+
+    /// <summary>Commanded target in joint units (degrees hinge, metres slide).</summary>
     public double TargetAngleDeg { get; private set; }
 
-    /// <summary>Actual joint angle in degrees.</summary>
-    public double AngleDeg => _mcu.Simulator.GetJointPos(_jointName) * 180.0 / Math.PI;
+    /// <summary>Actual joint position in joint units (degrees hinge, metres slide).</summary>
+    public double AngleDeg => _isSlide
+        ? _mcu.Simulator.GetJointPos(_jointName)
+        : _mcu.Simulator.GetJointPos(_jointName) * 180.0 / Math.PI;
 
+    /// <summary>Hinge servos: command the target angle in degrees.</summary>
     public void SetTargetAngleDeg(double degrees)
     {
-        TargetAngleDeg = Math.Clamp(degrees, _minAngleDeg, _maxAngleDeg);
+        if (_isSlide)
+            throw new InvalidOperationException("Slide servos take SetTargetPositionM.");
+        TargetAngleDeg = Math.Clamp(degrees, _min * 180.0 / Math.PI, _max * 180.0 / Math.PI);
     }
 
-    /// <summary>Duty 0..1 sweeps the angle range (0 → min, 1 → max).</summary>
+    /// <summary>Slide servos: command the joint position in metres.</summary>
+    public void SetTargetPositionM(double metres)
+    {
+        if (!_isSlide)
+            throw new InvalidOperationException("SetTargetPositionM is for slide servos.");
+        TargetAngleDeg = Math.Clamp(metres, _min, _max);
+    }
+
+    /// <summary>Duty 0..1 sweeps the position range (0 → min, 1 → max).</summary>
     public void ApplyDuty(double duty)
     {
         var d = Math.Clamp(duty, 0.0, 1.0);
-        SetTargetAngleDeg(_minAngleDeg + d * (_maxAngleDeg - _minAngleDeg));
+        var target = _min + d * (_max - _min);
+        TargetAngleDeg = _isSlide ? target : target * 180.0 / Math.PI;
     }
 
-    internal void Tick() => _mcu.Simulator.SetCtrlByIndex(_actuatorId, TargetAngleDeg * Math.PI / 180.0);
+    internal void Tick() =>
+        _mcu.Simulator.SetCtrlByIndex(_actuatorId,
+            _isSlide ? TargetAngleDeg : TargetAngleDeg * Math.PI / 180.0);
 }
 
 /// <summary>A DC fan (or any speed-controlled DC motor): duty scales the rated speed.</summary>

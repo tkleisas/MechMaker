@@ -84,10 +84,13 @@ What works today:
   Android UI and vision reads the screen, the androidtester/steropes loop, tool by
   tool: `hil_connect` → `screen_screencap` → `screen_find` / `screen_wait_for`
   (OpenCV template matching, fraction coordinates like androidtester's
-  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. **Physics-contact
-  taps are live**: a `touch_finger` part pressing the phone's glass in the physics
-  (gravity-driven slide tip) dispatches emulator taps at the contact point
-  (`arm_physics_taps`). Rig: `examples/phone_test_rig.json`; flagship scenario:
+  `touch.tap {from: [50%, 90%]}`) → `touch_tap` / `touch_swipe`. **Physics-contact taps are live and scripted**: a
+  `touch_finger` part — androidtester's spring finger as a servo-driven plunger —
+  arms over the phone, and commanding its slide servo (`set_finger_position`,
+  press −8 mm / retract +2 mm) physically taps the glass; each press dispatches an
+  emulator tap at the contact point (one per press episode; hold for long-press
+  timing). Servo-on-slide actuators take metre units (`min_pos_m`/`max_pos_m`).
+  Rig: `examples/phone_test_rig.json`; flagship scenario:
   `tools/scenario_smoke_wake_unlock.ps1` (wake → swipe to unlock → OCR-style home
   assertion via the dock); emulator self-start: `tools/emulator_start.ps1`.
 - **CLI**: `dotnet run --project src/MechMaker.Cli -- examples/linear_axis_v0.json out/axis.xml`
@@ -130,11 +133,12 @@ The catalog directory is found by walking up from the working directory (or set
   wire, run (`src/MechMaker.App`).
 - ~~**M4 — MCP server**~~ **done**: LLM agents assemble/wire/validate/simulate machines
   through 40 tools over stdio (`src/MechMaker.Server`).
+- **M6 — Emulator/vision HIL seam**: **done** (live adb, OpenCV vision, physics-contact
+  taps, scripted finger presses, smoke_wake_unlock on live Android).
 - **M5 — Real Klipper host** on the virtual MCU: **the protocol layer is done** (wire
   format, data dictionary, queue_step on the live loop, endstop homing, PWM out).
   Catalog growth: **leadscrews, gears, servos, fans, hotends done**. Remaining:
-  physics-contact taps on the HIL phone, embedding the actual klipper host binary
-  (klippy) against the simulated transport.
+  embedding the actual klipper host binary (klippy) against the simulated transport.
 
 ## Layout
 

@@ -63,10 +63,18 @@ public sealed class MachineSimulation : IDisposable
             switch (motor.Kind)
             {
                 case MotorKind.Servo:
-                    servosByInstance[instanceId] = mcu.AddServo($"a_{instanceId}",
-                        definition.Params.GetValueOrDefault("min_angle_deg", -90),
-                        definition.Params.GetValueOrDefault("max_angle_deg", 90));
+                {
+                    var isSlide = definition.Bodies
+                        .Any(b => b.Actuated == JointActuation.Slide);
+                    var min = isSlide
+                        ? definition.Params.GetValueOrDefault("min_pos_m", 0.0)
+                        : definition.Params.GetValueOrDefault("min_angle_deg", -90);
+                    var max = isSlide
+                        ? definition.Params.GetValueOrDefault("max_pos_m", 0.01)
+                        : definition.Params.GetValueOrDefault("max_angle_deg", 90);
+                    servosByInstance[instanceId] = mcu.AddServo($"a_{instanceId}", min, max, isSlide);
                     break;
+                }
                 case MotorKind.Dc:
                     var ratedRpm = definition.Params.GetValueOrDefault("rated_rpm", 6000);
                     fansByInstance[instanceId] = mcu.AddFan($"a_{instanceId}", ratedRpm / 60.0);

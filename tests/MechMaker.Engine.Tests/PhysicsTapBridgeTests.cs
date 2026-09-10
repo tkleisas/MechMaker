@@ -10,25 +10,42 @@ namespace MechMaker.Engine.Tests;
 /// </summary>
 public class PhysicsTapBridgeTests
 {
-    [Fact]
-    public void A_finger_press_on_the_screen_dispatches_a_tap_at_the_contact()
+[Fact]
+    public void Commanded_press_cycles_dispatch_one_tap_each()
     {
-        // The rig poses the finger 0.2 mm above the glass; gravity pulls the tip
-        // down, the tip contacts the screen, and the bridge maps the contact point
-        // (screen centre) to fractions and dispatches.
+        // The finger's tip is a servo plunger: drive it down (press), retract, press
+        // again — each physical press of the glass dispatches exactly one tap at the
+        // parked fraction (the screen centre in this rig).
         var dispatched = new List<(double Fx, double Fy)>();
         using var sim = TestRig();
         var bridge = new PhysicsTapBridge(sim, "dut", "finger", (fx, fy) => dispatched.Add((fx, fy)));
         bridge.Arm();
         sim.Mcu.PostTick += () => bridge.Tick();
 
-        sim.RunFor(0.05);
+        sim.RunFor(0.02); // settle at rest (tip just clear of the glass)
+        Assert.Empty(bridge.DispatchedTaps);
 
-                var tap = Assert.Single(bridge.DispatchedTaps);
-        // The finger sits over the screen centre.
-        Assert.InRange(tap.Fx, 0.45, 0.55);
-        Assert.InRange(tap.Fy, 0.45, 0.55);
-        Assert.Single(dispatched); // the dispatch callback saw the same tap
+        // Press: target -8 mm (the plunger drives through the glass).
+        sim.Servo("finger").SetTargetPositionM(-0.008);
+        sim.RunFor(0.05);
+        Assert.Equal(1, bridge.DispatchedTaps.Count);
+
+        // Retract: the contact episode ends.
+        sim.Servo("finger").SetTargetPositionM(0.002);
+        sim.RunFor(0.05);
+        Assert.Equal(1, bridge.DispatchedTaps.Count); // no new tap while clear
+
+        // Second press: another tap at the same fraction.
+        sim.Servo("finger").SetTargetPositionM(-0.008);
+        sim.RunFor(0.05);
+        Assert.Equal(2, bridge.DispatchedTaps.Count);
+        Assert.Equal(bridge.DispatchedTaps[0].Fx, bridge.DispatchedTaps[1].Fx, 3); // same parked spot
+        Assert.Equal(bridge.DispatchedTaps[0].Fy, bridge.DispatchedTaps[1].Fy, 3);
+        Assert.InRange(bridge.DispatchedTaps[0].Fx, 0.4, 0.6);
+        Assert.InRange(bridge.DispatchedTaps[0].Fy, 0.4, 0.6);
+
+        // The dispatch callback saw both taps too.
+        Assert.Equal(2, dispatched.Count);
     }
 
     [Fact]

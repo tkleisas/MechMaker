@@ -228,12 +228,22 @@ public static class MachineTools
     public static string GetRunStatus() => Locked(() => W.GetRunStatus());
 
     [McpServerTool(Name = "set_servo_angle")]
-    [Description("Command a wired servo's target angle in degrees (its duty sweeps the " +
+    [Description("Command a wired hinge servo's target angle in degrees (its duty sweeps the " +
                  "catalog-declared range; 0 = authored neutral).")]
     public static string SetServoAngle(
         [Description("Servo part instance id")] string instanceId,
         [Description("Target angle in degrees")] double degrees)
         => Locked(() => W.SetServoAngle(instanceId, degrees));
+
+    [McpServerTool(Name = "set_finger_position")]
+    [Description("Command a slide servo (e.g. the touch_finger press plunger) in metres: " +
+                 "negative = press toward the glass, positive/zero = retract. Each physical " +
+                 "press dispatches an emulator tap through the HIL bridge; hold the press " +
+                 "for long-press timing.")]
+    public static string SetFingerPosition(
+        [Description("Slide servo part instance id, e.g. 'finger'")] string instanceId,
+        [Description("Target joint position in metres (negative presses down)")] double metres)
+        => Locked(() => W.SetServoPosition(instanceId, metres));
 
     [McpServerTool(Name = "set_fan_duty")]
     [Description("Set a DC fan's drive duty (0..1); the actuator tracks duty × rated rpm.")]
