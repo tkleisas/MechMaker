@@ -32,11 +32,12 @@ catalog (parts) ──►  machine.json  ◄── visual builder (primary UI)
 
 What works today:
 
-- **Part catalog** (`catalog/*.json`): 17 seed parts — NEMA 17 stepper, NEMA 17 with
+- **Part catalog** (`catalog/*.json`): 19 seed parts — NEMA 17 stepper, NEMA 17 with
   T8-8 leadscrew + brass nut, 2020 beam, MGN12 rail + carriage, GT2 20T pulley,
   GT2 belt, endstop, corner bracket, mount plate, 20T/40T spur gears, SG90 servo
   (position actuator), 40 mm DC fan (velocity actuator), hotend (lumped thermal
-  model), and the android_phone HIL device.
+  model), the android_phone HIL device, and the guided T8 nut (rail-carried —
+  groundwork for the two-axis gantry).
 - **Machine format** (`schema/machine.schema.json`): parts, connections, boards, wiring.
 - **Compiler** (`MechMaker.Core`): validates the machine (machine-readable `mmNNN`
   diagnostics) and generates a MuJoCo MJCF model — body tree from welds, slide joints

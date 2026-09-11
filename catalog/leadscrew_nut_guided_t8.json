@@ -1,0 +1,21 @@
+{
+  "id": "leadscrew_nut_guided_t8",
+  "name": "Guided T8 leadscrew nut (rail-carried)",
+  "category": "linear_motion",
+  "description": "A T8 nut in a carrier that rides an MGN12 rail: the rail blocks the nut's rotation about the screw (a plain nut spins with its screw and everything hanging from it yaws). Connect thread to the screw, rail_side to a rail, mount to the load. The rail must be parallel to the screw.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.05,
+      "shapes": [
+        { "kind": "box", "extents": [0.021, 0.013, 0.011], "rgba": "0.85 0.75 0.35 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "thread", "type": "nut_t8", "pose": { "pos": [0, 0, -0.009], "rot": [180, 0, 0] } },
+    { "name": "rail_side", "type": "mgn12_carriage", "pose": { "pos": [0, 0, 0.006] }, "axis": [0, 0, 1] },
+    { "name": "mount", "type": "bolt_m3", "pose": { "pos": [0, 0, 0.013] } }
+  ],
+  "params": { "nut_sign": 1 }
+}

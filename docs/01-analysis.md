@@ -138,6 +138,29 @@ The 2-axis stage is therefore parked until the catalog grows a guided-carriage
 pair (or a keyway/anti-rotation connector) — the physics is already honest about
 why the naive rig fails, which is exactly what a digital twin is for.
 
+### Round two: the guided nut, and the deck-vs-gantry lesson
+
+Round two built the missing part — `leadscrew_nut_guided_t8`, a T8 nut in a
+carrier that rides an MGN12 rail: the rail blocks the nut's spin, and the screw
+connection becomes a coupler (the compiler now excludes guided-nut screw
+connections from the tree build, mirroring the belt-clamp pattern). The guided
+nut slid the Y axis correctly (8 mm/rev ✓, no yaw ✓).
+
+But the full two-axis gantry then hit a *structural* wall, not a connector one:
+**the device sits on the same beam the gantry travels on**. The base's only
+mounting line is y=0 — the same line the X carriage slides along. Every placement
+of the phone (top_a, top_b, end brackets) either collides with the carriage's
+travel or stands the phone vertical. The real androidtester separates them: the
+device nest is a fixture on the deck, the gantry is an *elevated* frame above it —
+the tool travels over the device and the tool-Z descends to reach it.
+
+The groundwork is committed and tested: the guided-nut part, bolt-through-slot
+compatibility, `GetBodyQuaternion`, the 2-axis `TapAtController`, and the
+connection-graph resolver in the workspace. What's missing is the frame: two
+parallel Y rails on standoff brackets, an X bridge across them, the device nest
+on the deck below — a proper CAD pass for the catalog's next milestone, best
+designed with the render tool verifying each step.
+
 ## Lessons the tests forced us to learn (so you don't have to)
 
 1. **8 kHz, not 1 kHz**: the stepper's magnetic spring is stiff; coarser
