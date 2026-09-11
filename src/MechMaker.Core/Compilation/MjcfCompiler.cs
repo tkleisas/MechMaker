@@ -156,6 +156,79 @@ public sealed class MjcfCompiler(PartCatalog catalog)
             _report.AddWarning("mm031",
                 $"Part '{instance.Id}' is not attached to the main assembly; it is not part of the compiled model.",
                 instance.Id);
+
+        CheckFloatingConnections(machine, compiled);
+    }
+
+    /// <summary>
+    /// Detects parts that mate at connector points but whose bodies never come
+    /// within 2 mm of each other — "magically floating" components. Rotation-aware:
+    /// cylinders contribute radius on X/Y and half-length on Z of their local OBB.
+    /// Transmission elements are exempt: the belt's schematic strap spans between
+    /// the pulleys by construction (mm021 covers missing pulleys).
+    /// </summary>
+    private void CheckFloatingConnections(MachineDefinition machine, HashSet<string> compiled)
+    {
+        var aabbOf = new Dictionary<string, (double[] Min, double[] Max)>();
+        foreach (var instance in machine.Parts)
+        {
+            if (!compiled.Contains(instance.Id))
+                continue;
+            var definition = _definitionOf[instance.Id];
+            double[] min = { double.MaxValue, double.MaxValue, double.MaxValue };
+            double[] max = { double.MinValue, double.MinValue, double.MinValue };
+            var any = false;
+            foreach (var body in definition.Bodies)
+            {
+                if (!_bodyWorld.TryGetValue(Key(instance.Id, body.Name), out var bodyWorld))
+                    continue;
+                foreach (var shape in body.Shapes)
+                {
+                    var world = bodyWorld * ToTransform(shape.RelativePose);
+                    var (hx, hy, hz) = shape.Kind == ShapeKind.Cylinder
+                        ? (shape.Extents.X, shape.Extents.X, shape.Extents.Y / 2)
+                        : (shape.Extents.X / 2, shape.Extents.Y / 2, shape.Extents.Z / 2);
+                    var r = world.Rotation;
+                    var c1 = r.Rotate(Vec3.UnitX);
+                    var c2 = r.Rotate(Vec3.UnitY);
+                    var c3 = r.Rotate(Vec3.UnitZ);
+                    double[] e =
+                    {
+                        Math.Abs(c1.X) * hx + Math.Abs(c2.X) * hy + Math.Abs(c3.X) * hz,
+                        Math.Abs(c1.Y) * hx + Math.Abs(c2.Y) * hy + Math.Abs(c3.Y) * hz,
+                        Math.Abs(c1.Z) * hx + Math.Abs(c2.Z) * hy + Math.Abs(c3.Z) * hz
+                    };
+                    min[0] = Math.Min(min[0], world.Position.X - e[0]);
+                    max[0] = Math.Max(max[0], world.Position.X + e[0]);
+                    min[1] = Math.Min(min[1], world.Position.Y - e[1]);
+                    max[1] = Math.Max(max[1], world.Position.Y + e[1]);
+                    min[2] = Math.Min(min[2], world.Position.Z - e[2]);
+                    max[2] = Math.Max(max[2], world.Position.Z + e[2]);
+                    any = true;
+                    any = true;
+                }
+            }
+            if (any)
+                aabbOf[instance.Id] = (min, max);
+        }
+
+        foreach (var connection in machine.Connections)
+        {
+            if (!aabbOf.TryGetValue(connection.PartA, out var a) ||
+                !aabbOf.TryGetValue(connection.PartB, out var b))
+                continue;
+            if (_definitionOf[connection.PartA].IsTransmissionElement ||
+                _definitionOf[connection.PartB].IsTransmissionElement)
+                continue;
+            var gap = 0.0;
+            for (var i = 0; i < 3; i++)
+                gap = Math.Max(gap, Math.Max(a.Min[i] - b.Max[i], b.Min[i] - a.Max[i]));
+            if (gap > 0.002)
+                _report.AddWarning("mm039",
+                    $"Connection '{connection.Id}' is floating: the mated parts' bodies are {(gap - 0.002) * 1000:0.#} mm apart " +
+                    "at the closest — add a bracket, clamp, or standoff, or adjust the connector poses.",
+                    connection.Id);
+        }
     }
 
     private void AttachPart(MachineDefinition machine, Connection connection,
@@ -432,10 +505,27 @@ public sealed class MjcfCompiler(PartCatalog catalog)
                     EmitClampCoupler(belt.Id, beltDef, clampedInstance, joint1, radius1);
             }
 
-            // Schematic visual strap at the belt's declared pose (no collision).
+            // Visual strap spanning between the two pulleys (no collision): centred
+            // at the pulley midpoint, oriented along the line between their centres —
+            // the strap physically touches what it couples instead of floating at
+            // the belt's authored pose.
             var length = beltDef.Params.GetValueOrDefault("length", BeltGeomLengthDefault);
-            var strap = new XElement("body", new XAttribute("name", belt.Id));
-            SetTransformAttributes(strap, ToTransform(belt.Pose));
+            XElement strap;
+            if (pulleyInstances.Count == 2 &&
+                _bodyWorld.TryGetValue(Key(pulleyInstances[0], "root"), out var p0) &&
+                _bodyWorld.TryGetValue(Key(pulleyInstances[1], "root"), out var p1))
+            {
+                var mid = (p0.Position + p1.Position) * 0.5;
+                var dir = p1.Position - p0.Position;
+                var yaw = Math.Atan2(dir.Y, dir.X);
+                strap = new XElement("body", new XAttribute("name", belt.Id));
+                SetTransformAttributes(strap, new Transform(mid, Quat.FromEulerXyz(new Vec3(0, 0, yaw))));
+            }
+            else
+            {
+                strap = new XElement("body", new XAttribute("name", belt.Id));
+                SetTransformAttributes(strap, ToTransform(belt.Pose));
+            }
             strap.Add(new XElement("geom",
                 new XAttribute("name", $"{belt.Id}_strap"),
                 new XAttribute("type", "box"),

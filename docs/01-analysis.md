@@ -115,6 +115,27 @@ carriage; the finger tool hangs from the carriage, arming over the screen.*
 
 *The minimal rig: finger arming over the phone, side by side.*
 
+### Floating connections: parts that mate at points but hang in the air
+
+The connector system mates parts at *points* — nothing guaranteed the parts'
+**bodies** actually touch. Measuring every connection in every rig with
+rotation-aware bounding boxes found real offenders: pulleys floating 2 mm off
+their motor shafts, the belt's visual strap 60 mm away from the pulleys it
+couples, the belt clamp 17 mm off the belt, and the leadscrew nut riding 12 mm
+of air past the end of its screw.
+
+Fixes landed:
+- the belt's strap now renders **between the pulleys it couples** (computed from
+  their compiled positions, oriented along the line between them) instead of at
+  an authored pose;
+- the leadscrew's screw connector moved to mid-screw, so the nut lands on the
+  metal instead of 12 mm past its end;
+- and a new validator diagnostic, **mm039**, warns whenever a connection's
+  bodies don't come within 2 mm of each other — rotation-aware (cylinders
+  contribute radius on X/Y, half-length on Z), so rotated parts measure
+  correctly. The gear_train's schematic gear placement is honestly flagged; the
+  strap-spanning belt connections are exempt as a documented M0 simplification.
+
 ### The Y axis: a real rig-design lesson
 
 A two-axis attempt (a T8 leadscrew stage stacked on the X carriage, the finger

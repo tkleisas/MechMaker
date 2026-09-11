@@ -195,3 +195,29 @@ public class CompilerTests
 
 
 
+
+
+public class FloatingConnectionTests
+{
+    [Fact]
+    public void The_gear_train_flags_its_schematic_placement_as_floating()
+    {
+        var machine = TestRepo.Catalog() is { } catalog
+            ? CoreJson.Deserialize<MachineDefinition>(File.ReadAllText(Path.Combine(TestRepo.Root(), "examples", "gear_train.json")))
+            : throw new InvalidOperationException("no catalog");
+        var compiler = new MjcfCompiler(TestRepo.Catalog());
+        compiler.Compile(machine);
+        Assert.Contains(compiler.LastReport.Diagnostics, d => d.Code == "mm039");
+        Assert.False(compiler.LastReport.HasErrors);
+    }
+
+    [Fact]
+    public void The_leadscrew_nut_rides_its_screw_not_the_air()
+    {
+        var machine = CoreJson.Deserialize<MachineDefinition>(
+            File.ReadAllText(Path.Combine(TestRepo.Root(), "examples", "leadscrew_z_axis.json")));
+        var compiler = new MjcfCompiler(TestRepo.Catalog());
+        compiler.Compile(machine);
+        Assert.DoesNotContain(compiler.LastReport.Diagnostics, d => d.Code == "mm039");
+    }
+}

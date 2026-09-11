@@ -40,7 +40,9 @@ What works today:
   groundwork for the two-axis gantry).
 - **Machine format** (`schema/machine.schema.json`): parts, connections, boards, wiring.
 - **Compiler** (`MechMaker.Core`): validates the machine (machine-readable `mmNNN`
-  diagnostics) and generates a MuJoCo MJCF model — body tree from welds, slide joints
+  diagnostics — including **mm039 floating connections**: parts mating at connector
+  points whose bodies don't touch, caught with rotation-aware bounding boxes) and
+  generates a MuJoCo MJCF model — body tree from welds, slide joints
   for carriages and leadscrew nuts, hinge joints with torque actuators for motor rotors
   (with reflected rotor inertia), belt couplers (pulleys mirrored; belt-clamped parts
   ride the belt at pitch_radius × pulley angle), leadscrew couplers (nut = lead/(2π)
