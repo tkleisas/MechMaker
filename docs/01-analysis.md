@@ -115,6 +115,29 @@ carriage; the finger tool hangs from the carriage, arming over the screen.*
 
 *The minimal rig: finger arming over the phone, side by side.*
 
+### The Y axis: a real rig-design lesson
+
+A two-axis attempt (a T8 leadscrew stage stacked on the X carriage, the finger
+hanging from its nut) taught a mechanism lesson the hard way. The build revealed
+three things, each caught by the closed loop:
+
+1. **Mount frames compound** — every connector mating composes a rotation; the
+   finger's orientation is the product of the whole chain from the root part.
+   Hand-deriving the adapter euler fails; the honest approach is measuring body
+   quaternions from the compiled model (`GetBodyQuaternion`) and solving for the
+   adapter — implemented in the Simulator for exactly this.
+2. **A leadscrew nut spins with its screw.** The Y stage's nut (and the finger
+   hanging from it) is free to yaw around the screw axis — under the gantry's
+   X-acceleration the whole arm swings ±27 mm and jams the belt (400+ missed
+   steps). A real rig constrains the nut with a second rail or keyway.
+3. **The press axis sign is mating-dependent** — the plunger's slide axis in
+   world flips with the mount; a positioning controller must measure the axis
+   direction and not assume a sign.
+
+The 2-axis stage is therefore parked until the catalog grows a guided-carriage
+pair (or a keyway/anti-rotation connector) — the physics is already honest about
+why the naive rig fails, which is exactly what a digital twin is for.
+
 ## Lessons the tests forced us to learn (so you don't have to)
 
 1. **8 kHz, not 1 kHz**: the stepper's magnetic spring is stiff; coarser

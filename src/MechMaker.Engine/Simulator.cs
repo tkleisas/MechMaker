@@ -178,6 +178,14 @@ public sealed unsafe class Simulator : IDisposable
         return [_data->xpos[id * 3], _data->xpos[id * 3 + 1], _data->xpos[id * 3 + 2]];
     }
 
+    /// <summary>Body orientation as (w, x, y, z) — for computing adapter rotations
+    /// between stacked frames (the gantry's screw-to-finger mounts).</summary>
+    public double[] GetBodyQuaternion(string name)
+    {
+        var id = BodyId(name);
+        return [_data->xquat[id * 4], _data->xquat[id * 4 + 1], _data->xquat[id * 4 + 2], _data->xquat[id * 4 + 3]];
+    }
+
     /// <summary>Copy of the full position vector (deterministic snapshots for tests/reports).</summary>
     public double[] QposSnapshot()
     {
