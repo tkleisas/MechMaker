@@ -1,6 +1,6 @@
 # MechMaker — Architecture & Verified Behaviour
 
-> Every number in this document is asserted by a test. Run `dotnet test` (195 tests).
+> Every number in this document is asserted by a test. Run `dotnet test` (204 tests).
 
 One artifact — `machine.json` — drives three frontends: the visual builder (M3),
 the MCP server for LLM agents (M4), and the headless engine everything shares.
@@ -93,23 +93,44 @@ Android, entirely through MCP tools.
 *The emulator under test (Android 16, API 36): the HIL seam drives this UI with
 physics taps and reads it with OpenCV.*
 
-## The gantry and `tap_at` — the full loop
+## The gantry and `tap_at` — the full loop (M7, two-axis)
 
-`examples/phone_gantry_rig.json` mounts a `touch_finger` on a belt-driven
-carriage above the phone. The finger is androidtester's spring finger as a
-servo-driven plunger (press −8 mm, retract +2 mm; hold for long-press timing).
+`examples/phone_gantry_rig.json` elevates the gantry above the deck: the phone
+lies on a plate at the beam centre, the X rail rides on stacked corner-bracket
+standoffs, and a Y stage hangs from the X carriage — a yaw-90 rail with a guided
+T8 nut, driven by a leadscrew motor mounted at the rail's end. The `touch_finger`
+hangs from the nut; its servo plunger descends to tap the glass.
 
-**`tap_at(fx)` closes vision → motion → contact**: it measures the live scene
-(arm offset, glass plane, press depth — no catalog constants), positions the
-gantry with a correct-and-retry loop (converging within ~0.6 mm of a 68 mm
-screen), presses 2 mm past the glass, and reports the fraction the tip *actually
-pressed* (the gantry parks where the physics puts it). Two commanded columns land
-in their commanded neighbourhoods: 35% and 65%.
+**`tap_at(fx, fy)` closes vision → motion → contact on both axes**: it measures
+the live scene (arm offset, glass plane, press depth — no catalog constants),
+servos both stages continuously (no stop-and-settle — the belt/leadscrew
+equality's recoil would eat the correction), presses with a measured slide
+direction (the mount decides which sign presses), and reports the fraction the
+tip *actually pressed*. The physics confirms it end-to-end: commanded (35%, 50%)
+and (65%, 50%) each dispatch exactly one emulator tap at (35%, 48.7%) and
+(64%, 48.4%).
+
+Three rig-design traps fell to the closed loop:
+
+1. **The arm sweeps through whatever drives the Y stage** — the finger's
+   horizontal arm reaches ±54 mm in X and crosses every fixed Y position it can
+   travel to; a carriage-mounted Y motor is guaranteed collision. The motor now
+   mounts at the Y rail's *end* (max arm reach in screen space: y=+0.022 of the
+   ±0.2 rail span).
+2. **The X rail crosses the work area** — the finger's 34 mm drop puts the tip's
+   travel band inside the rail's band, so a tap crossing the rail's y-position
+   must duck. `tap_at` plungers down to 3 mm above the glass before traversing
+   (tip top clears the rail bottom), then presses from there.
+3. **A coplanar box contact glues a carriage** — the catalog carriage now floats
+   its block half a millimetre inside its own body (a real MGN12 carriage wraps
+   the rail on bearing blocks), instead of changing connector geometry (which
+   the mating-math test guards).
 
 ![gantry rig](img/phone_gantry.png)
 
-*The gantry rig: the phone (dark slab) sits on a side plate under the belt-driven
-carriage; the finger tool hangs from the carriage, arming over the screen.*
+*The two-axis gantry rig: the phone on the deck, the elevated X rail on its
+standoff stack, the Y rail and end-mounted leadscrew, the finger arming over
+the screen.*
 
 ![rig close-up](img/phone_rig.png)
 
@@ -159,28 +180,31 @@ The 2-axis stage is therefore parked until the catalog grows a guided-carriage
 pair (or a keyway/anti-rotation connector) — the physics is already honest about
 why the naive rig fails, which is exactly what a digital twin is for.
 
-### Round two: the guided nut, and the deck-vs-gantry lesson
+### Round three: the elevated frame, and the duck-and-debounce lessons
 
-Round two built the missing part — `leadscrew_nut_guided_t8`, a T8 nut in a
-carrier that rides an MGN12 rail: the rail blocks the nut's spin, and the screw
-connection becomes a coupler (the compiler now excludes guided-nut screw
-connections from the tree build, mirroring the belt-clamp pattern). The guided
-nut slid the Y axis correctly (8 mm/rev ✓, no yaw ✓).
+The structural wall fell in M7: the gantry now elevates on a standoff stack
+(two corner brackets), holding the rail over the deck-mounted phone — a compact
+version of androidtester's deck/gantry separation. Both axes drive taps; the
+guided nut carries the finger without yaw. What remained was a *mechanics*
+clean-up the closed loop exposed:
 
-But the full two-axis gantry then hit a *structural* wall, not a connector one:
-**the device sits on the same beam the gantry travels on**. The base's only
-mounting line is y=0 — the same line the X carriage slides along. Every placement
-of the phone (top_a, top_b, end brackets) either collides with the carriage's
-travel or stands the phone vertical. The real androidtester separates them: the
-device nest is a fixture on the deck, the gantry is an *elevated* frame above it —
-the tool travels over the device and the tool-Z descends to reach it.
+- **The press bounced**: a long fall onto the glass rebounds, and each rebound
+  counted as a fresh tap. Landing now happens in two steps (settle 1 mm above
+  the kiss, then push 2 mm past), and the dispatch bridge ignores re-contact
+  inside a 100 ms refractory window — one tap per press again.
+- **The press's sign is mount-dependent, and its *offset* too**: the Y stage's
+  mounting flips the plunger axis (positive slide presses), and the compiled
+  geometry (catalog extents halve into MJCF sizes) makes the contact point
+  flush with the tip body. `tap_at` probes the slide with a small nudge and
+  derives direction and offset from the measured slope — no catalog constants.
+- **Stop-and-settle recoil cancels slow corrections**: the belt's (and the
+  leadscrew's) equality springs unwind when the loop stops to settle, so both
+  converge loops now drive continuously and only stop inside tolerance.
 
-The groundwork is committed and tested: the guided-nut part, bolt-through-slot
-compatibility, `GetBodyQuaternion`, the 2-axis `TapAtController`, and the
-connection-graph resolver in the workspace. What's missing is the frame: two
-parallel Y rails on standoff brackets, an X bridge across them, the device nest
-on the deck below — a proper CAD pass for the catalog's next milestone, best
-designed with the render tool verifying each step.
+![rig close-up](img/phone_rig.png)
+
+*The two-axis rig: elevated rail on the standoff stack, Y rail across it with
+the end-mounted leadscrew, finger arming over the deck-mounted phone.*
 
 ## Lessons the tests forced us to learn (so you don't have to)
 
@@ -203,3 +227,10 @@ designed with the render tool verifying each step.
    degenerates; test icons carry internal structure.
 8. **Simulator body positions are zero until kinematics run** — anything reading
    the compiled pose must refresh first.
+9. **Coplanar box-on-box contact is glue**: μ×(static friction on a full-face
+   contact) outdrags a soft kinematic coupler; model sliding parts with a hair
+   of clearance instead of changing connector geometry.
+10. **Catalog extents halve into MJCF sizes** — every "contact depth" derived
+    from the catalog must be checked against the compiled scene, not the JSON.
+11. **Contact episodes need a refractory**: edges alone count a bounce as two
+    taps; re-arm only after a sustained (100 ms) clear interval.
