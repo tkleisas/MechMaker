@@ -14,6 +14,8 @@
   ],
   "connectors": [
     { "name": "mount", "type": "tslot_2020", "pose": { "pos": [0, 0, -0.004], "rot": [180, 0, 0] } },
+    { "name": "end_b", "type": "bolt_m3", "pose": { "pos": [0.2, 0, 0], "rot": [0, -90, 0] } },
+    { "name": "mount_yaw90", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.004], "rot": [180, 0, 90] } },
     { "name": "carriage_top", "type": "mgn12_rail", "pose": { "pos": [0, 0, 0.004] }, "axis": [1, 0, 0] }
   ]
 }

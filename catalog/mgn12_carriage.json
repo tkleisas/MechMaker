@@ -2,13 +2,13 @@
   "id": "mgn12_carriage",
   "name": "MGN12 carriage block",
   "category": "linear_motion",
-  "description": "Standard carriage for MGN12 rails. Connector sits on its underside; slides along the rail's length axis.",
+  "description": "Standard carriage for MGN12 rails. Connector sits on its underside; slides along the rail's length axis. The block model floats half a mm above the rail face — the real carriage wraps the rail on bearing blocks, and a coplanar box would glue itself to the rail with sliding friction.",
   "bodies": [
     {
       "name": "root",
       "mass_kg": 0.05,
       "shapes": [
-        { "kind": "box", "extents": [0.027, 0.027, 0.013], "relative_pose": { "pos": [0, 0, 0.0065] }, "rgba": "0.6 0.6 0.66 1" }
+        { "kind": "box", "extents": [0.027, 0.027, 0.013], "relative_pose": { "pos": [0, 0, 0.007] }, "rgba": "0.6 0.6 0.66 1" }
       ]
     }
   ],

@@ -28,7 +28,7 @@
   ],
   "params": {
     "min_pos_m": -0.03,
-    "max_pos_m": 0.002,
+    "max_pos_m": 0.04,
     "servo_kp": 80.0,
     "servo_kv": 1.1
   },

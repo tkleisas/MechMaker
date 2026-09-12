@@ -630,18 +630,28 @@ private HilSession RequireHil() =>
             ?? throw new InvalidOperationException("No touch_finger part.");
         var carriage = CarriageOf(finger.Id)
             ?? throw new InvalidOperationException("The finger has no parent connection (no gantry to move).");
-        var stepper = _machine.Wiring
+        string? XStepperOf() => _machine.Wiring
             .Where(w => w.Signal == "step")
             .Select(w => w.Component)
-            .FirstOrDefault(id => _machine.Parts.Any(p => p.Id == id))
+            .FirstOrDefault(id => Catalog.Find(_machine.Parts.FirstOrDefault(p => p.Id == id)?.Part ?? "")?.Id
+                == "nema17_stepper");
+        string? YStepperOf() => _machine.Wiring
+            .Where(w => w.Signal == "step")
+            .Select(w => w.Component)
+            .FirstOrDefault(id => Catalog.Find(_machine.Parts.FirstOrDefault(p => p.Id == id)?.Part ?? "")?.Id
+                == "nema17_leadscrew_t8");
+        var stepper = XStepperOf()
+            ?? _machine.Wiring.Where(w => w.Signal == "step").Select(w => w.Component)
+                .FirstOrDefault(id => _machine.Parts.Any(p => p.Id == id))
             ?? throw new InvalidOperationException("No wired stepper to drive the gantry.");
 
         var phoneDef = Catalog.Get(phone.Part);
         var screenWidth = phoneDef.Params.GetValueOrDefault("screen_width_m", 0.068);
+        var screenHeight = phoneDef.Params.GetValueOrDefault("screen_height_m", 0.144);
 
         var controller = new TapAtController(RequireRun(), phone.Id, finger.Id,
-            carriage, stepper, screenWidth);
-        var (achievedFx, achievedFy) = controller.Tap(fx);
+            carriage, stepper, screenWidth, YStepperOf(), screenHeight);
+        var (achievedFx, achievedFy) = controller.Tap(fx, fy);
         return $"Physical tap dispatched at ({achievedFx * 100:0.#}%, {achievedFy * 100:0.#}%) " +
                $"(commanded ({fx * 100:0.#}%, {fy * 100:0.#}%)).";
     }

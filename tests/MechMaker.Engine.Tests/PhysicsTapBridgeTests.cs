@@ -51,25 +51,27 @@ public class PhysicsTapBridgeTests
     [Fact]
     public void The_gantry_taps_where_it_parks()
     {
-        // The gantry rig: belt-driven carriage, finger on the tool mount, phone under
-        // the travel. Tap at the park position, move the gantry, tap again — the two
-        // taps land at DIFFERENT screen fractions, proving the contact point follows
-        // the machine's motion (the androidtester positioning story).
+        // The two-axis gantry rig: belt-driven X carriage carrying a leadscrew Y
+        // stage with the finger on the nut. Park over the screen centre, tap; move
+        // the gantry; tap again — the two taps land at DIFFERENT screen fractions,
+        // proving the contact point follows the machine's motion (the androidtester
+        // positioning story).
         using var sim = TestRig("phone_gantry_rig.json");
         var taps = new List<(double Fx, double Fy)>();
         var bridge = new PhysicsTapBridge(sim, "dut", "finger", (fx, fy) => taps.Add((fx, fy)));
         bridge.Arm();
         sim.Mcu.PostTick += () => bridge.Tick();
-
-        // The finger mounts on the carriage with the arm over the screen centre.
         sim.RunFor(0.02);
-        sim.Servo("finger").SetTargetPositionM(-0.030);
-        sim.RunFor(0.10);
-        sim.Servo("finger").SetTargetPositionM(0.002);
-        sim.RunFor(0.10);
+
+        // The finger parks off the glass; drive both stages over the screen centre
+        // (raw drives — TapAtController owns the careful version of this loop).
+        DriveUntil(sim, "motor_left", () => sim.Simulator.GetBodyPosition("finger_tip")[0], 0.0, 0.001, 3.0);
+        DriveUntil(sim, "y_leadscrew", () => sim.Simulator.GetBodyPosition("finger_tip")[1], 0.0, 0.002, -5.0);
+        PressCycle(sim);
         Assert.Equal(1, bridge.DispatchedTaps.Count);
         var first = bridge.DispatchedTaps[0];
-        Assert.InRange(first.Fx, 0.4, 0.6); // screen centre
+        Assert.InRange(first.Fx, 0.3, 0.7); // screen centre-ish
+        Assert.InRange(first.Fy, 0.3, 0.7);
 
         // Move the gantry +X (1 rev/s, 0.35 s, ramp included; the belt slips a little
         // under the tool load — the tap lands wherever the machine actually parked).
@@ -81,13 +83,46 @@ public class PhysicsTapBridgeTests
         sim.RunFor(0.02);
 
         // Tap again: same screen row, different column.
-        sim.Servo("finger").SetTargetPositionM(-0.030);
-        sim.RunFor(0.10);
+        PressCycle(sim);
         Assert.Equal(2, bridge.DispatchedTaps.Count);
         var second = bridge.DispatchedTaps[1];
         Assert.True(second.Fx > first.Fx + 0.1, $"expected a rightward tap: {first.Fx:0.###} -> {second.Fx:0.###}");
-        Assert.InRange(second.Fy, 0.4, 0.6);  // same row
+        Assert.InRange(second.Fy, first.Fy - 0.1, first.Fy + 0.1); // same row
         Assert.InRange(second.Fx, 0.05, 0.95); // still on the glass
+    }
+
+    /// <summary>Spin a stepper at ±<paramref name="speedRevPerSec"/> until the
+    /// measured coordinate reaches <paramref name="target"/> (sign picked by a
+    /// probe: positive speed moves +rev; the loop corrects whichever way it goes).</summary>
+    private static void DriveUntil(MachineSimulation sim, string stepperId,
+        Func<double> measured, double target, double tolerance, double speedRevPerSec)
+    {
+        var stepper = sim.Stepper(stepperId);
+        stepper.Enable();
+        for (var attempt = 0; attempt < 600; attempt++) // 30 s of motion budget
+        {
+            var delta = target - measured();
+            if (Math.Abs(delta) < tolerance)
+                break;
+            // On this rig +rev of the belt moves the tip +X, +rev of the screw moves
+            // it −Y — the caller encodes that in the signed speed.
+            stepper.SetVelocityRevPerSec(delta > 0 ? speedRevPerSec : -speedRevPerSec);
+            sim.RunFor(0.05);
+        }
+        stepper.SetVelocityRevPerSec(0);
+        sim.RunFor(0.05);
+    }
+
+    /// <summary>One plunger tap: on this rig the finger's stack is mounted so the
+    /// slide presses on POSITIVE travel. The kiss sits ≈23 mm below slide-zero, so
+    /// +24 mm is a sub-mm overdrive — enough to register on the glass without
+    /// punching through the phone or bouncing into a second contact episode.</summary>
+    private static void PressCycle(MachineSimulation sim)
+    {
+        sim.Servo("finger").SetTargetPositionM(0.024);
+        sim.RunFor(0.25);
+        sim.Servo("finger").SetTargetPositionM(0.0);
+        sim.RunFor(0.15);
     }
 
     [Fact]

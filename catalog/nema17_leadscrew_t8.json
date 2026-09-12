@@ -24,6 +24,7 @@
   ],
   "connectors": [
     { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, -0.02], "rot": [180, 0, 0] } },
+    { "name": "mount_yaw90", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, -0.02], "rot": [-90, 0, 0] } },
     { "name": "screw", "type": "screw_t8", "body": "rotor", "pose": { "pos": [0, 0, 0.05] } }
   ],
   "params": { "lead_mm": 8 },

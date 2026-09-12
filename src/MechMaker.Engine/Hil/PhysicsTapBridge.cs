@@ -50,10 +50,11 @@ public sealed class PhysicsTapBridge
         // simulators have identity xpos until the first mj_kinematics/step).
         _simulation.Simulator.RefreshKinematics();
         var pos = _simulation.Simulator.GetBodyPosition(bodyName);
-        // The compiled box geom carries the full extents from the catalog shape
-        // (0.0355, 0.0755, 0.004 half-extents for android_phone). The screen frame:
-        // front face centre is +t/2 along the body Z, and fractions map across
-        // screen_width/height which equal the full X/Y extents.
+        // The compiled box geom carries the catalog shape extents HALVED into MJCF
+        // size (half-extents: 0.01775, 0.03775, 0.002 for android_phone). The screen
+        // frame: front face centre is +t/2 along the body Z (the physical surface),
+        // and fractions map across screen_width/height (the catalog params, which
+        // are independent of the visual box).
         _phoneCx = pos[0];
         _phoneCy = pos[1];
         _phoneCz = pos[2];
@@ -95,15 +96,22 @@ public sealed class PhysicsTapBridge
             if (!_pressing)
             {
                 _pressing = true;
+                _clearTicks = 0;
                 DispatchedTaps.Add((fx, fy));
                 _dispatchTap(fx, fy);
             }
             return;
         }
-        _pressing = false;
+
+        // The episode ends only after a sustained clear interval: a tip that
+        // bounces off the glass leaves it for a few ms at a time, and without a
+        // refractory each bounce would dispatch another tap.
+        if (_pressing && ++_clearTicks >= 800) // 100 ms at the 8 kHz MCU tick
+            _pressing = false;
     }
 
     private bool _pressing;
+    private int _clearTicks;
 
     /// <summary>Taps dispatched by physical contact (diagnostics/tests).</summary>
     public List<(double Fx, double Fy)> DispatchedTaps { get; } = [];
