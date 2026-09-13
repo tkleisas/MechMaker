@@ -95,14 +95,13 @@ physics taps and reads it with OpenCV.*
 
 ## The container — the portability gate
 
-`Dockerfile` runs the same suite (physics, engine, server, vision) on
-**linux-x64** inside a container: `docker build -t mechmaker .` — the test
-stage *is* the image's health gate, so a build only lands if every suite passes
-off-Windows. `docker run --rm mechmaker` then serves the MCP server over stdio
-(the `tools/mcp_e2e.ps1` handshake passes against the container, 47 tools, the
-catalog read from the image's `/repo`).
+`Dockerfile` runs the full suite — physics, engine, server, vision **and real
+OCR** — on **linux-x64** inside a container: `docker build -t mechmaker .` (the
+`test` stage is the image's health gate; `docker run --rm mechmaker` serves the
+MCP server over stdio — the `tools/mcp_e2e.ps1` handshake passes against the
+container, 47 tools, the catalog read from the image's `/repo`).
 
-Two portability findings worth keeping:
+Three portability findings worth keeping:
 
 - **The base is Ubuntu 22.04 (jammy), on purpose.** OpenCvSharp's Linux extern
   (`libOpenCvSharpExtern.so`) is linked against jammy-era natives — tesseract 4,
@@ -111,11 +110,17 @@ Two portability findings worth keeping:
   and `patchelf --remove-needed` trips ld.so's version-check assertion. On
   jammy every dependency is native; .NET 10 arrives via the official install
   script (jammy is a supported .NET 10 platform).
-- **OCR skips in the container**: the Tesseract .NET wrapper ships Windows-only
-  natives and jammy's tesseract is 4.1 where the wrapper wants 5.x —
-  `MECHMAKER_TESSDATA` points at an empty dir, so `TextDetector`'s documented
-  skip path applies and the OCR tests pass by skipping. A source-built
-  libtesseract 5 is the follow-up.
+- **OCR is source-built**: jammy's tesseract is 4.1 but the .NET wrapper wants
+  5.x, so the image builds tesseract 5.3.4 from source against jammy's own
+  leptonica 1.82 (the version the wrapper's `LeptonicaDllName` expects). The
+  wrapper's loader probes *app-relative* paths only, so `libtesseract50.so`
+  and `libleptonica-1.82.0.so` aliases sit next to every test binary and the
+  published app; glibc ≥2.34 folded `libdl` into libc, so the wrapper's
+  `libdl` P/Invoke gets an alias too. tessdata is fetched at build time (the
+  same tessdata_fast model the Windows script fetches).
+- **cmake installed no soname symlink** for the built libtesseract — a dangling
+  `libtesseract.so.5` alias fails the wrapper's probe with "Failed to find
+  library" even though the versioned file sits right there; one `ln -sf` away.
 
 The live adb transport stays host-side by design: the container pairs with the
 fake emulator, and `ANDROID_ADB`/`adb connect` over TCP bridges a host emulator.

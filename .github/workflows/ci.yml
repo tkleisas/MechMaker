@@ -23,8 +23,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # The Windows path: where the OCR tests genuinely run (the Tesseract wrapper's
-  # natives are Windows-only) and the Avalonia/adb side lives.
+  # The Windows path: the desktop side (Avalonia builder, adb transport) and a
+  # second gate for the same suite — OCR runs on both platforms now (the
+  # container source-builds tesseract 5; Windows uses the wrapper's natives).
   windows-suite:
     runs-on: windows-latest
     timeout-minutes: 30
