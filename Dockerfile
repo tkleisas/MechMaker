@@ -42,7 +42,8 @@ COPY catalog/ catalog/
 COPY examples/ examples/
 COPY scripts/ scripts/
 COPY schema/ schema/
-COPY tessdata/ tessdata/
+# tessdata/ stays out of the image: it's a fetched artifact (gitignored) and OCR
+# skips in the container anyway (MECHMAKER_TESSDATA → empty dir).
 
 # The MCP server, published for the runtime stage.
 RUN dotnet publish src/MechMaker.Server/MechMaker.Server.csproj -c Release -o /publish
