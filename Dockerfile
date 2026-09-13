@@ -13,8 +13,9 @@
 # wants 5.x) — MECHMAKER_TESSDATA points at an empty dir so TextDetector's
 # documented skip path applies. A source-built libtesseract 5 is the follow-up.
 #
-#   docker build -t mechmaker .
-#   docker run --rm mechmaker            # MCP server over stdio
+#   docker build --target test -t mechmaker:test .   # the portability gate
+#   docker build -t mechmaker .                      # MCP server over stdio
+#   docker run --rm mechmaker
 #
 # The live adb transport stays host-side: point ANDROID_ADB at an adb binary or
 # connect to a host emulator over TCP when running with --network.
