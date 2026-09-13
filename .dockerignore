@@ -1,0 +1,6 @@
+.git
+out
+docs
+tools
+**/bin
+**/obj

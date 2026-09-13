@@ -35,6 +35,7 @@ public class TextDetectorTests
     [Fact]
     public void Ocr_distinguishes_lines()
     {
+        if (!TextDetector.IsAvailable) return;
         _emulator.DrawText("SETTINGS", 0.5, 0.2, heightPx: 80);
         _emulator.DrawText("DISPLAY", 0.5, 0.5, heightPx: 80);
         var screen = _emulator.Screencap();
@@ -52,6 +53,7 @@ public class TextDetectorTests
     [Fact]
     public void Ocr_returns_null_when_the_text_is_absent()
     {
+        if (!TextDetector.IsAvailable) return;
         _emulator.DrawText("BATTERY", 0.5, 0.3, heightPx: 80);
         var screen = _emulator.Screencap();
 
@@ -61,6 +63,7 @@ public class TextDetectorTests
     [Fact]
     public void Read_screen_lists_multiple_lines()
     {
+        if (!TextDetector.IsAvailable) return;
         _emulator.DrawText("WELCOME", 0.5, 0.2, heightPx: 80);
         _emulator.DrawText("SETTINGS", 0.5, 0.5, heightPx: 80);
         _emulator.DrawText("ABOUT", 0.5, 0.8, heightPx: 80);

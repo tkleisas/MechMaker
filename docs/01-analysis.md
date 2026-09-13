@@ -93,6 +93,33 @@ Android, entirely through MCP tools.
 *The emulator under test (Android 16, API 36): the HIL seam drives this UI with
 physics taps and reads it with OpenCV.*
 
+## The container — the portability gate
+
+`Dockerfile` runs the same suite (physics, engine, server, vision) on
+**linux-x64** inside a container: `docker build -t mechmaker .` — the test
+stage *is* the image's health gate, so a build only lands if every suite passes
+off-Windows. `docker run --rm mechmaker` then serves the MCP server over stdio
+(the `tools/mcp_e2e.ps1` handshake passes against the container, 47 tools, the
+catalog read from the image's `/repo`).
+
+Two portability findings worth keeping:
+
+- **The base is Ubuntu 22.04 (jammy), on purpose.** OpenCvSharp's Linux extern
+  (`libOpenCvSharpExtern.so`) is linked against jammy-era natives — tesseract 4,
+  gtk2, ffmpeg 4.4, OpenEXR 2.5 — and ffmpeg's symbols are *version-tagged*
+  (`LIBAVCODEC_58`), so newer distros can't satisfy them by soname symlinks
+  and `patchelf --remove-needed` trips ld.so's version-check assertion. On
+  jammy every dependency is native; .NET 10 arrives via the official install
+  script (jammy is a supported .NET 10 platform).
+- **OCR skips in the container**: the Tesseract .NET wrapper ships Windows-only
+  natives and jammy's tesseract is 4.1 where the wrapper wants 5.x —
+  `MECHMAKER_TESSDATA` points at an empty dir, so `TextDetector`'s documented
+  skip path applies and the OCR tests pass by skipping. A source-built
+  libtesseract 5 is the follow-up.
+
+The live adb transport stays host-side by design: the container pairs with the
+fake emulator, and `ANDROID_ADB`/`adb connect` over TCP bridges a host emulator.
+
 ## The gantry and `tap_at` — the full loop (M7, two-axis)
 
 `examples/phone_gantry_rig.json` elevates the gantry above the deck: the phone
