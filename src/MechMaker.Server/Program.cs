@@ -1,12 +1,42 @@
 using MechMaker.Server;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-// MechMaker M4: MCP server over stdio. LLM agents assemble, wire, validate,
-// compile, and simulate machines through the tools in MachineTools.cs.
-// Run: dotnet run --project src/MechMaker.Server
+// MechMaker M4: MCP server. LLM agents assemble, wire, validate, compile, and
+// simulate machines through the tools in MachineTools.cs.
+//
+//   stdio (default):  dotnet run --project src/MechMaker.Server
+//   streamable HTTP:  dotnet run --project src/MechMaker.Server -- --http [port]
+//                     (default port 8080; the MCP endpoint is /mcp)
 
+if (args.Contains("--http"))
+{
+    var port = 8080;
+    var httpIndex = Array.IndexOf(args, "--http");
+    if (httpIndex >= 0 && httpIndex + 1 < args.Length && int.TryParse(args[httpIndex + 1], out var requested))
+        port = requested;
+
+    var web = WebApplication.CreateBuilder(args);
+
+    // stdout stays free for whoever wants it; logs to stderr like stdio mode.
+    web.Logging.ClearProviders();
+    web.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
+
+    web.WebHost.UseUrls($"http://0.0.0.0:{port}");
+    web.Services.AddMcpServer()
+        .WithHttpTransport()
+        .WithToolsFromAssembly();
+
+    var app = web.Build();
+    app.MapMcp("/mcp"); // streamable HTTP at /mcp (the SDK's parameterless overload maps the root)
+    app.Run();
+    return;
+}
+
+// stdio transport (the agent default).
 var builder = Host.CreateApplicationBuilder(args);
 
 // stdout carries the MCP stdio protocol — every log goes to stderr instead.

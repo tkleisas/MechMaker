@@ -98,8 +98,11 @@ physics taps and reads it with OpenCV.*
 `Dockerfile` runs the full suite — physics, engine, server, vision **and real
 OCR** — on **linux-x64** inside a container: `docker build -t mechmaker .` (the
 `test` stage is the image's health gate; `docker run --rm mechmaker` serves the
-MCP server over stdio — the `tools/mcp_e2e.ps1` handshake passes against the
-container, 47 tools, the catalog read from the image's `/repo`).
+MCP server over stdio, and `docker run --rm -p 8080:8080 mechmaker --http` serves
+**streamable HTTP at `/mcp`** — the same 47 tools, remote-agent reachable: the
+`tools/mcp_e2e.ps1` handshake passes against the container, the catalog read
+from the image's `/repo`). The server picks the transport by argument: stdio
+(default) or `--http [port]` — one tool surface, two doors.
 
 Three portability findings worth keeping:
 

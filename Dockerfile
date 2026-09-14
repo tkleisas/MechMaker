@@ -13,8 +13,9 @@
 # engine, server, OpenCV vision AND real OCR — runs on linux-x64.
 #
 #   docker build --target test -t mechmaker:test .   # the portability gate
-#   docker build -t mechmaker .                      # MCP server over stdio
-#   docker run --rm mechmaker
+#   docker build -t mechmaker .                      # MCP server
+#   docker run --rm mechmaker                        # stdio (agent default)
+#   docker run --rm -p 8080:8080 mechmaker --http    # streamable HTTP at /mcp
 #
 # The live adb transport stays host-side: point ANDROID_ADB at an adb binary or
 # connect to a host emulator over TCP when running with --network.
@@ -116,4 +117,5 @@ RUN ln -sf /lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libdl.so \
     && ln -sf /usr/local/lib/libtesseract.so.5 app/libtesseract50.so
 # The workspace resolves the catalog by walking up from the working directory:
 # /repo has it, the app DLL sits in app/.
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "app/MechMaker.Server.dll"]
