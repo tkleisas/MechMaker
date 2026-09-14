@@ -613,6 +613,40 @@ private HilSession RequireHil() =>
     }
 
     /// <summary>
+    /// The session machine's compiled scene as JSON for the web viewer: semantic
+    /// primitives (box/cylinder + world pose + rgba + source geom name) that the
+    /// browser renders with three.js — no tessellation, no pixels over the wire.
+    /// </summary>
+    public string SceneJson()
+    {
+        var compiler = new MechMaker.Core.Compilation.MjcfCompiler(Catalog);
+        var mjcf = compiler.Compile(_machine).ToString();
+        using var simulator = Simulator.FromMjcf(mjcf);
+        simulator.RefreshKinematics();
+        var scene = simulator.GetScene();
+
+        string N(double v) => v.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture);
+        static string Q(string s) => "\"" + System.Text.Json.JsonEncodedText.Encode(s).ToString() + "\"";
+        var sb = new System.Text.StringBuilder();
+        sb.Append("{\"name\":").Append(Q(_machine.Name)).Append(",\"shapes\":[");
+        for (var i = 0; i < scene.Count; i++)
+        {
+            var s = scene[i];
+            if (i > 0) sb.Append(',');
+            sb.Append("{\"n\":").Append(Q(s.Name))
+              .Append(",\"k\":").Append((int)s.Kind)
+              .Append(",\"h\":[").Append(N(s.HalfX)).Append(',').Append(N(s.HalfY)).Append(',').Append(N(s.HalfZ)).Append(']')
+              .Append(",\"p\":[").Append(N(s.Px)).Append(',').Append(N(s.Py)).Append(',').Append(N(s.Pz)).Append(']')
+              .Append(",\"r\":[").Append(N(s.R00)).Append(',').Append(N(s.R01)).Append(',').Append(N(s.R02)).Append(',')
+              .Append(N(s.R10)).Append(',').Append(N(s.R11)).Append(',').Append(N(s.R12)).Append(',')
+              .Append(N(s.R20)).Append(',').Append(N(s.R21)).Append(',').Append(N(s.R22)).Append(']')
+              .Append(",\"c\":[").Append(N(s.R)).Append(',').Append(N(s.G)).Append(',').Append(N(s.B)).Append(',').Append(N(s.A)).Append("]}");
+        }
+        sb.Append("]}");
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// One physical tap at a screen fraction: resolves the gantry (the finger's
     /// parent connection partner + the first wired stepper), measures the live
     /// geometry, positions, presses, retracts. Requires arm_physics_taps (the

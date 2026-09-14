@@ -296,6 +296,12 @@ public static class MachineTools
         [Description("Camera pitch in radians (default 0.55)")] double? pitchRad = null)
         => Locked(() => W.RenderScene(outputPath, live, yawRad, pitchRad));
 
+    // ---------- web viewer ----------
+
+    /// <summary>The session machine's compiled scene as JSON — consumed by the
+    /// web viewer (not an MCP tool), but through the same session gate.</summary>
+    public static string SceneJson() => Locked(() => W.SceneJson());
+
     [McpServerTool(Name = "tap_at")]
     [Description("One physical tap at a screen fraction: the gantry parks the finger over " +
                  "that point (correct-and-retry positioning), the plunger presses the glass, " +

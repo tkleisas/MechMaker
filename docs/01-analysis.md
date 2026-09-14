@@ -99,10 +99,13 @@ physics taps and reads it with OpenCV.*
 OCR** — on **linux-x64** inside a container: `docker build -t mechmaker .` (the
 `test` stage is the image's health gate; `docker run --rm mechmaker` serves the
 MCP server over stdio, and `docker run --rm -p 8080:8080 mechmaker --http` serves
-**streamable HTTP at `/mcp`** — the same 47 tools, remote-agent reachable: the
-`tools/mcp_e2e.ps1` handshake passes against the container, the catalog read
-from the image's `/repo`). The server picks the transport by argument: stdio
-(default) or `--http [port]` — one tool surface, two doors.
+**streamable HTTP** — the same 47 tools, remote-agent reachable — plus the
+human doors: **`/` is a three.js viewer** that renders the session machine's
+compiled scene from **`/scene`** (semantic box/cylinder primitives with world
+pose, rgba and source geom names — no tessellation, no pixels over the wire),
+with hover tooltips, a reload button and a 1 Hz "live" checkbox that follows an
+active physics run. The server picks the transport by argument: stdio
+(default) or `--http [port]` — one tool surface, three doors.
 
 Three portability findings worth keeping:
 

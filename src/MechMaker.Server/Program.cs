@@ -1,6 +1,7 @@
 using MechMaker.Server;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -32,6 +33,11 @@ if (args.Contains("--http"))
 
     var app = web.Build();
     app.MapMcp("/mcp"); // streamable HTTP at /mcp (the SDK's parameterless overload maps the root)
+
+    // The human door: the three.js viewer + the scene it renders.
+    app.MapGet("/", () => Results.Content(WebUi.Html, "text/html"));
+    app.MapGet("/scene", () => Results.Text(MachineTools.SceneJson(), "application/json"));
+
     app.Run();
     return;
 }
