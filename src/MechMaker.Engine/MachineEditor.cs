@@ -73,7 +73,8 @@ public sealed class MachineEditor : IDisposable
         }
         catch (MjcfCompileException)
         {
-            // Invalid machine: keep last good scene; the diagnostics panel shows why.
+            // Invalid machine: the edit scene stays empty until it compiles again;
+            // the status bar's validation report shows why (mm0xx codes).
         }
         MachineChanged?.Invoke();
     }
@@ -210,6 +211,22 @@ public sealed class MachineEditor : IDisposable
     {
         ThrowIfUnknownPart(instanceId);
         return Catalog.Get(Machine.Parts.First(p => p.Id == instanceId).Part);
+    }
+
+    /// <summary>Sets per-instance parameters on a parametric part (rod length,
+    /// gear teeth...). Throws ParamEvalException / reports mm041-style unknown
+    /// keys through Recompile's validation — the caller surfaces them.</summary>
+    public void SetPartParams(string instanceId, IReadOnlyDictionary<string, double> parameters)
+    {
+        ThrowIfUnknownPart(instanceId);
+        var merged = new Dictionary<string, double>(Machine.Parts.First(p => p.Id == instanceId).Params);
+        foreach (var (key, value) in parameters)
+            merged[key] = value;
+        Machine = Machine with
+        {
+            Parts = [.. Machine.Parts.Select(p => p.Id == instanceId ? p with { Params = merged } : p)]
+        };
+        Recompile();
     }
 
     public void ThrowIfUnknownPart(string instanceId)

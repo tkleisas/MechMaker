@@ -117,6 +117,13 @@ Proof parts: `rod_8mm` (parametric length) and `spur_gear_parametric`
 pulley spacing), **chains** (pitch × links), plus mass expressions (a rod's mass
 should scale with its length — currently the catalog default is kept).
 
+The **Avalonia properties panel** drives it from the desktop: selecting a part
+populates one numeric field per declared param (instance override or default);
+"Apply params" goes through `MachineEditor.SetPartParams` — the same gate as
+the agents' `set_part_params` — and the viewport recompiles. A rejected edit
+leaves the edit scene empty until the machine is valid again, with the mm-code
+in the status bar.
+
 ## The container — the portability gate
 
 `Dockerfile` runs the full suite — physics, engine, server, vision **and real

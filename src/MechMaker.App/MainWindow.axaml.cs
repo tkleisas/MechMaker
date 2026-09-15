@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private MachineEditor? _editor;
     private MachineSimulation? _simulation;
     private string? _selectedInstanceId;
+    private readonly Dictionary<string, TextBox> _paramBoxes = [];
 
     public MainWindow()
     {
@@ -150,16 +151,90 @@ public partial class MainWindow : Window
         var instance = _editor.Machine.Parts[MachineList.SelectedIndex];
         _selectedInstanceId = instance.Id;
 
-        PartId.Text = instance.Id;
-        PosX.Text = Num(instance.Pose.Position.X);
-        PosY.Text = Num(instance.Pose.Position.Y);
-        PosZ.Text = Num(instance.Pose.Position.Z);
-        RotX.Text = Num(instance.Pose.RotationEulerDeg.X);
-        RotY.Text = Num(instance.Pose.RotationEulerDeg.Y);
-        RotZ.Text = Num(instance.Pose.RotationEulerDeg.Z);
+          PartId.Text = instance.Id;
+          PosX.Text = Num(instance.Pose.Position.X);
+          PosY.Text = Num(instance.Pose.Position.Y);
+          PosZ.Text = Num(instance.Pose.Position.Z);
+          RotX.Text = Num(instance.Pose.RotationEulerDeg.X);
+          RotY.Text = Num(instance.Pose.RotationEulerDeg.Y);
+          RotZ.Text = Num(instance.Pose.RotationEulerDeg.Z);
 
-        Viewport.Invalidate();
-    }
+          RefreshParamsPanel(instance);
+
+          Viewport.Invalidate();
+      }
+
+      /// <summary>One numeric field per declared param of the selected part's
+      /// catalog entry: label + current value (instance override or default).</summary>
+      private void RefreshParamsPanel(PartInstance instance)
+      {
+          ParamsPanel.Children.Clear();
+          _paramBoxes.Clear();
+
+          var definition = _editor?.Catalog.Find(instance.Part);
+          var declared = definition?.Params.Keys.OrderBy(k => k).ToList() ?? [];
+          if (declared.Count == 0)
+          {
+              ParamsPanel.Children.Add(new TextBlock
+              {
+                  Text = "(no parameters)", Foreground = Avalonia.Media.Brushes.Gray, Margin = new(2)
+              });
+              return;
+          }
+
+          var grid = new Grid();
+          for (var i = 0; i < declared.Count; i++)
+              grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+          for (var i = 0; i < declared.Count; i++)
+          {
+              var name = declared[i];
+              grid.Children.Add(new TextBlock
+              {
+                  Text = name, Margin = new(2), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                  [Grid.RowProperty] = i, [Grid.ColumnProperty] = 0
+              });
+              var box = new TextBox
+              {
+                  Text = Num(instance.Params.TryGetValue(name, out var v) ? v : definition!.Params[name]),
+                  Margin = new(2)
+              };
+              box.SetValue(Grid.RowProperty, i);
+              box.SetValue(Grid.ColumnProperty, 1);
+              grid.Children.Add(box);
+              _paramBoxes[name] = box;
+          }
+          ParamsPanel.Children.Add(grid);
+          var apply = new Button
+          {
+              Content = "Apply params", Margin = new(2, 6, 2, 2),
+              HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
+          };
+          apply.Click += OnApplyParams;
+          ParamsPanel.Children.Add(apply);
+      }
+
+      private void OnApplyParams(object? sender, RoutedEventArgs e)
+      {
+          if (_editor is null || _selectedInstanceId is null)
+              return;
+          try
+          {
+              var parameters = new Dictionary<string, double>();
+              foreach (var (name, box) in _paramBoxes)
+                  parameters[name] = double.Parse(box.Text ?? "", System.Globalization.CultureInfo.InvariantCulture);
+              _editor.SetPartParams(_selectedInstanceId, parameters);
+          }
+          catch (FormatException)
+          {
+              ModeText.Text = "invalid number in param fields";
+          }
+          catch (Exception ex)
+          {
+              // SetPartParams surfaces mm041 (unknown key) and mm040 (bad
+              // expression) as exceptions; show them, keep the last good scene.
+              ModeText.Text = ex.Message;
+          }
+      }
 
     private void OnCatalogSelected(object? sender, SelectionChangedEventArgs e) => RefreshCatalogConnectors();
 
