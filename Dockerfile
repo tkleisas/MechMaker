@@ -17,6 +17,9 @@
 #   docker run --rm mechmaker                        # stdio (agent default)
 #   docker run --rm -p 8080:8080 mechmaker --http    # streamable HTTP at /mcp
 #
+# Prebuilt images ship on every main push and milestone tag:
+#   ghcr.io/tkleisas/mechmaker[:tag|latest]
+#
 # The live adb transport stays host-side: point ANDROID_ADB at an adb binary or
 # connect to a host emulator over TCP when running with --network.
 
