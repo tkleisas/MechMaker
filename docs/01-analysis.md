@@ -93,6 +93,30 @@ Android, entirely through MCP tools.
 *The emulator under test (Android 16, API 36): the HIL seam drives this UI with
 physics taps and reads it with OpenCV.*
 
+## Parametric parts (M9 core)
+
+Parts can be **parametric**: a `machine.json` instance carries `"params"` (e.g.
+`{"length_m": 0.25}`) that merge over the catalog defaults, and shapes/connector
+poses/derived params accept **expressions** ("length_m/2", "module_mm*teeth/2000"
+— four operations, parentheses, parameter references; no dependence on order of
+declaration). The compiler and validator materialize one effective definition
+per instance before any code path sees it, so couplers, validation and the web
+viewer all follow the instance's parameters automatically.
+
+Verified closed-loop:
+
+| Claim | Test-verified value |
+|---|---|
+| Gear ratio from params | a 60T:20T pair of the *same* catalog part (`spur_gear_parametric`, module 2) compiles to a **3:1** mesh coupler; pitch radius = module·teeth/2 |
+| Rod ends track the length | `rod_8mm` at `length_m: 0.25` materializes end connectors at **±0.125 m** |
+| Typos are caught | an instance param the part doesn't declare → validator error **mm041**; a failing expression → **mm040** |
+| Resolution order | catalog defaults ← instance overrides ← derived params recompute from the merged set |
+
+Proof parts: `rod_8mm` (parametric length) and `spur_gear_parametric`
+(teeth/module). Backlog for more parametric parts: **belts** (length from
+pulley spacing), **chains** (pitch × links), plus mass expressions (a rod's mass
+should scale with its length — currently the catalog default is kept).
+
 ## The container — the portability gate
 
 `Dockerfile` runs the full suite — physics, engine, server, vision **and real

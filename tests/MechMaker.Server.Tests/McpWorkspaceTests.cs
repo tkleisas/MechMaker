@@ -28,7 +28,7 @@ public class McpWorkspaceTests : IDisposable
     [Fact]
     public void Catalog_discovers_the_repo_seed_parts()
     {
-        Assert.Equal(19, _w.Catalog.All.Count);
+        Assert.Equal(21, _w.Catalog.All.Count);
         Assert.NotNull(_w.Catalog.Find("nema17_stepper"));
         Assert.NotNull(_w.Catalog.Find("gt2_belt_400"));
     }
@@ -67,6 +67,23 @@ public class McpWorkspaceTests : IDisposable
         var result = _w.SaveMachine(path);
         Assert.Contains("saved", result);
     }
+
+    [Fact]
+    public void Set_part_params_resizes_a_rod_and_validates()
+    {
+        _w.AddPart("rod_8mm", "rod1");
+        var result = _w.SetPartParams("rod1", "{\"length_m\":0.25}");
+        Assert.Contains("Validated OK", result);
+        Assert.Equal(0.25, _w.Machine.Parts.Single(p => p.Id == "rod1").Params["length_m"]);
+
+        // A typo is caught, not silently ignored.
+        var bad = _w.SetPartParams("rod1", "{\"lenght_m\":0.4}");
+        Assert.Contains("mm041", bad);
+    }
+
+    [Fact]
+    public void Set_part_params_on_an_unknown_instance_throws()
+        => Assert.Throws<KeyNotFoundException>(() => _w.SetPartParams("nope", "{}"));
 
     [Fact]
     public void Save_without_a_path_reuses_the_last_opened_file()

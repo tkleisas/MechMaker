@@ -6,6 +6,12 @@ public sealed record PartInstance
     public required string Id { get; init; }
     public required string Part { get; init; }
     public Pose Pose { get; init; } = Pose.Identity;
+
+    /// <summary>Per-instance parameter overrides, merged over the catalog part's
+    /// defaults at compile time (parametric geometry: rod length, gear teeth...).
+    /// Keys must name params the catalog part declares; values are metres/millimetres
+    /// exactly as the part's expressions expect.</summary>
+    public Dictionary<string, double> Params { get; init; } = [];
 }
 
 /// <summary>A declared mating between two connectors of two placed parts.</summary>

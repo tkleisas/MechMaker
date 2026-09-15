@@ -302,6 +302,16 @@ public static class MachineTools
     /// web viewer (not an MCP tool), but through the same session gate.</summary>
     public static string SceneJson() => Locked(() => W.SceneJson());
 
+    [McpServerTool(Name = "set_part_params")]
+    [Description("Set per-instance parameters on a parametric part: rod length_m, gear " +
+                 "teeth/module_mm, ... Geometry, connectors and coupler ratios derive from the " +
+                 "params (e.g. gear pitch radius = module*teeth/2). Unknown keys are rejected by " +
+                 "validation (mm041). Returns the validator's verdict.")]
+    public static string SetPartParams(
+        [Description("Part instance id, e.g. 'rod1'")] string instanceId,
+        [Description("Parameters as a JSON object, e.g. {\"length_m\":0.25}")] string paramsJson)
+        => Locked(() => W.SetPartParams(instanceId, paramsJson));
+
     [McpServerTool(Name = "tap_at")]
     [Description("One physical tap at a screen fraction: the gantry parks the finger over " +
                  "that point (correct-and-retry positioning), the plunger presses the glass, " +

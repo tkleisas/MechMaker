@@ -1,4 +1,5 @@
 using MechMaker.Core.Model;
+using MechMaker.Core.Parametric;
 
 namespace MechMaker.Core.Validation;
 
@@ -45,6 +46,24 @@ public sealed class MachineValidator(PartCatalog catalog)
 
             if (definition.Bodies.Count == 0)
                 report.AddError("mm002", $"Catalog part '{definition.Id}' has no bodies.", instance.Id);
+
+            // Parametric sanity: every instance param must name a param the part
+            // declares (a typo otherwise vanishes silently), and the expressions
+            // must evaluate against them.
+            foreach (var key in instance.Params.Keys)
+            {
+                if (!definition.Params.ContainsKey(key) && definition.ParamsExpr?.ContainsKey(key) != true)
+                    report.AddError("mm041",
+                        $"Part instance '{instance.Id}' (catalog '{definition.Id}') sets unknown param '{key}'.", instance.Id);
+            }
+            try
+            {
+                ResolvedParts.Materialize(definition, instance.Params, instance.Id);
+            }
+            catch (ParamEvalException e)
+            {
+                report.AddError("mm040", e.Message, instance.Id);
+            }
         }
     }
 

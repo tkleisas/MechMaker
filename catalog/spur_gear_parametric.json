@@ -1,0 +1,25 @@
+{
+  "id": "spur_gear_parametric",
+  "name": "Spur gear (parametric teeth & module)",
+  "category": "transmission",
+  "description": "A spur gear from params: teeth (default 20) and module_mm (default 2). The pitch radius is derived — module_mm*teeth/2/1000 metres — and drives both the visual disc and the mesh ratio automatically: mesh two parametric gears and the coupler ratio is teethA/teethB. Mount on a shaft via the bore; the gear connector is the mesh interface.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.015,
+      "shapes": [
+        { "kind": "cylinder",
+          "extents": [0.01, 0.005, 0],
+          "extents_expr": ["pitch_radius", "0.005", "0"],
+          "relative_pose": { "rot": [90, 0, 0] },
+          "rgba": "0.55 0.55 0.6 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "bore", "type": "bore_5mm", "pose": { "pos": [0, 0, 0], "rot": [180, 0, 0] } },
+    { "name": "gear", "type": "gear_teeth", "pose": { "pos": [0, 0.01, 0], "rot": [0, 90, 0] }, "pos_expr": ["0", "pitch_radius", "0"] }
+  ],
+  "params": { "teeth": 20, "module_mm": 1 },
+  "params_expr": { "pitch_radius": "module_mm*teeth/2000" }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1",
+  "name": "parametric_gear_pair",
+  "description": "Two PARAMETRIC spur gears meshed: 60 teeth on the driven side, 20 on the driver (both module 2) — the same catalog part instantiated twice with different params. The pitch radii (60 mm : 20 mm) and the mesh connector positions derive from the params, and the coupler ratio is 3:1 purely from the data.",
+  "parts": [
+    { "id": "base", "part": "beam_2020_400", "pose": { "pos": [0, 0, 0] } },
+    { "id": "plate_a", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "plate_b", "part": "motor_mount_plate_2020", "pose": {} },
+    { "id": "motor_a", "part": "nema17_stepper", "pose": {} },
+    { "id": "motor_b", "part": "nema17_stepper", "pose": {} },
+    { "id": "gear_driver", "part": "spur_gear_parametric", "pose": {},
+      "params": { "teeth": 20, "module_mm": 2 } },
+    { "id": "gear_driven", "part": "spur_gear_parametric", "pose": {},
+      "params": { "teeth": 60, "module_mm": 2 } }
+  ],
+  "connections": [
+    { "id": "plate_a_on_base", "part_a": "base", "connector_a": "end_a", "part_b": "plate_a", "connector_b": "tslot" },
+    { "id": "plate_b_on_base", "part_a": "base", "connector_a": "end_b", "part_b": "plate_b", "connector_b": "tslot" },
+    { "id": "motor_a_on_plate", "part_a": "plate_a", "connector_a": "motor_face", "part_b": "motor_a", "connector_b": "mount" },
+    { "id": "motor_b_on_plate", "part_a": "plate_b", "connector_a": "motor_face", "part_b": "motor_b", "connector_b": "mount" },
+    { "id": "gear_driver_on_shaft", "part_a": "motor_a", "connector_a": "shaft", "part_b": "gear_driver", "connector_b": "bore" },
+    { "id": "gear_driven_on_shaft", "part_a": "motor_b", "connector_a": "shaft", "part_b": "gear_driven", "connector_b": "bore" },
+    { "id": "gear_mesh", "part_a": "gear_driver", "connector_a": "gear", "part_b": "gear_driven", "connector_b": "gear" }
+  ],
+  "boards": [
+    { "id": "main", "type": "skr-pico" }
+  ],
+  "wiring": [
+    { "component": "motor_a", "signal": "step", "board": "main", "pin": "P2_2" },
+    { "component": "motor_a", "signal": "dir", "board": "main", "pin": "P2_6" },
+    { "component": "motor_a", "signal": "enable", "board": "main", "pin": "P2_1" },
+    { "component": "motor_b", "signal": "step", "board": "main", "pin": "P6_2" },
+    { "component": "motor_b", "signal": "dir", "board": "main", "pin": "P6_6" },
+    { "component": "motor_b", "signal": "enable", "board": "main", "pin": "P6_1" }
+  ]
+}

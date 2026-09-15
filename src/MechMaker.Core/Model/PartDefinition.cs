@@ -25,12 +25,20 @@ public sealed record Shape
 {
     public ShapeKind Kind { get; init; } = ShapeKind.Box;
 
-    /// <summary>Full extents for boxes; for cylinders Radius/Length are read from Extents.X / Extents.Y.</summary>
+    /// <summary>Full extents for boxes; for cylinders Radius/Length are read from Extents.X / Extents.Y.
+    /// Materialized value: the default when <see cref="ExtentsExpr"/> is null, else the expression result.</summary>
     public Vec3 Extents { get; init; } = new(0.01, 0.01, 0.01);
+
+    /// <summary>Parametric extents: three expressions ("length_m/2", "0.006"...) overriding
+    /// <see cref="Extents"/> per instance. Present only on parametric shapes.</summary>
+    public string[]? ExtentsExpr { get; init; }
 
     public Pose RelativePose { get; init; } = Pose.Identity;
 
-    /// <summary>Hex colour for rendering, e.g. "0.2 0.2 0.25" is written to MJCF as rgba — keep as three-space string.</summary>
+    /// <summary>Parametric position override for <see cref="RelativePose"/> ("0", "length_m/2"...).</summary>
+    public string[]? PosExpr { get; init; }
+
+    /// <summary>Hex colour for rendering, e.g. "0.2 0.2 0.25" is written to MJCF as rgba ? keep as three-space string.</summary>
     public string Rgba { get; init; } = "0.6 0.6 0.65 1";
 }
 
@@ -40,6 +48,9 @@ public sealed record ConnectorDefinition
     public string Name { get; init; } = "";
     public ConnectorType Type { get; init; }
     public Pose Pose { get; init; } = Pose.Identity;
+
+    /// <summary>Parametric position override for <see cref="Pose"/> ("length_m/2"...).</summary>
+    public string[]? PosExpr { get; init; }
 
     /// <summary>Motion axis for slide-type interfaces (e.g. the rail's length direction); default +Z.</summary>
     public Vec3 Axis { get; init; } = new(0, 0, 1);
@@ -107,8 +118,14 @@ public sealed record PartDefinition
     public List<ConnectorDefinition> Connectors { get; init; } = [];
     public MotorSpec? Motor { get; init; }
 
-    /// <summary>Free-form spec values (pulley teeth, pitch radius, rail travel limits...).</summary>
+    /// <summary>Free-form spec values (pulley teeth, pitch radius, rail travel limits...).
+    /// Materialized defaults; per-instance overrides merge over these.</summary>
     public Dictionary<string, double> Params { get; init; } = [];
+
+    /// <summary>Derived params as expressions over other params — e.g. a parametric
+    /// gear's "pitch_radius": "module_mm*teeth/2000". Evaluated in dictionary order
+    /// during materialization, before shape/connector expressions.</summary>
+    public Dictionary<string, string>? ParamsExpr { get; init; }
 
     /// <summary>True for parts that are purely transmission (belt) and never rigidly mounted.</summary>
     public bool IsTransmissionElement { get; init; }

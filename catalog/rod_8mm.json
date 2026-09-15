@@ -1,0 +1,23 @@
+{
+  "id": "rod_8mm",
+  "name": "Smooth rod, 8 mm (parametric length)",
+  "category": "linear_motion",
+  "description": "A smooth 8 mm linear rod along local +Z with a parametric length (param length_m, default 0.1 m). The end connectors sit exactly at ±length_m/2 — brackets, bearings and nuts bolt to the ends regardless of length. Set length_m on the instance to resize the rod.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.03,
+      "shapes": [
+        { "kind": "cylinder",
+          "extents": [0.004, 0.1, 0],
+          "extents_expr": ["0.004", "length_m", "0"],
+          "rgba": "0.75 0.75 0.8 1" }
+      ]
+    }
+  ],
+  "connectors": [
+    { "name": "end_a", "type": "bolt_m3", "pose": { "pos": [0, 0, 0.05] }, "pos_expr": ["0", "0", "length_m/2"] },
+    { "name": "end_b", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.05] }, "pos_expr": ["0", "0", "-length_m/2"] }
+  ],
+  "params": { "length_m": 0.1 }
+}

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using MechMaker.Core.Mathematics;
 using MechMaker.Core.Model;
+using MechMaker.Core.Parametric;
 using MechMaker.Core.Validation;
 
 namespace MechMaker.Core.Compilation;
@@ -57,7 +58,12 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         if (report.HasErrors)
             throw new MjcfCompileException(report);
         _report = report;
-        _definitionOf = machine.Parts.ToDictionary(p => p.Id, p => catalog.Get(p.Part), StringComparer.Ordinal);
+        // Per-instance resolution: parametric parts (rod length, gear teeth...)
+        // materialize into numeric definitions before any code path sees them.
+        _definitionOf = machine.Parts.ToDictionary(
+            p => p.Id,
+            p => ResolvedParts.Materialize(catalog.Get(p.Part), p.Params, p.Id),
+            StringComparer.Ordinal);
         _bodyWorld = [];
         _bodyElement = [];
         _drivingJointOf = [];

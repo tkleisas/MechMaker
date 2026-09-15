@@ -274,6 +274,30 @@ public sealed class McpWorkspace : IDisposable
         return $"Wired {component}.{signal} -> {board}.{pin}.";
     }
 
+    /// <summary>Sets per-instance parameters on a parametric part (rod length,
+    /// gear teeth/module...). Unknown keys fail validation with mm041 — a typo
+    /// never silently does nothing.</summary>
+    public string SetPartParams(string instanceId, string paramsJson)
+    {
+        var instance = _machine.Parts.FirstOrDefault(p => p.Id == instanceId)
+            ?? throw new KeyNotFoundException($"No part instance '{instanceId}'. Known: {string.Join(", ", _machine.Parts.Select(p => p.Id))}");
+        var incoming = CoreJson.Deserialize<Dictionary<string, double>>(paramsJson);
+        var merged = new Dictionary<string, double>(instance.Params);
+        foreach (var (key, value) in incoming)
+            merged[key] = value;
+        _machine = _machine with
+        {
+            Parts = [.. _machine.Parts.Select(p => p.Id == instanceId ? p with { Params = merged } : p)]
+        };
+
+        var report = new MachineValidator(Catalog).Validate(_machine);
+        var errors = report.Diagnostics.Where(d => d.Severity == Severity.Error).ToList();
+        var applied = string.Join(", ", incoming.Select(kv => $"{kv.Key}={kv.Value:0.####}"));
+        return errors.Count == 0
+            ? $"Parameters set on '{instanceId}': {applied}. Validated OK."
+            : $"Parameters set on '{instanceId}', but validation failed: " + string.Join("; ", errors.Select(e => e.ToString()));
+    }
+
     // ---------- scenarios (Lua) ----------
 
     public string RunScenarioFile(string path) => RunScenario(LuaScenario.LoadFile(path));
