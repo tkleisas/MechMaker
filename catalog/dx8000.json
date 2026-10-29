@@ -1,0 +1,178 @@
+{
+  "id": "dx8000",
+  "name": "Ingenico AXIUM DX8000 (digital twin)",
+  "category": "electronics",
+  "description": "Flat-mounted DX8000 proxy for robot/HIL work. Root origin is the screen centre; +Z is the screen normal; +X runs from the card-slot/bottom edge toward the printer/contactless head. The two box shapes are the invisible collision proxy that carries mass; the OBJ meshes are the visual shell (screen, bezel, head, pad, buttons, slot). First-pass dimensions from the datasheet and product images; refine from calipers.",
+  "bodies": [
+    {
+      "name": "root",
+      "mass_kg": 0.45,
+      "shapes": [
+        {
+          "kind": "box",
+          "extents": [
+            0.15,
+            0.083,
+            0.025
+          ],
+          "relative_pose": {
+            "pos": [
+              -0.005,
+              0,
+              -0.0125
+            ]
+          },
+          "rgba": "0.10 0.10 0.12 1",
+          "visible": false,
+          "collision": true,
+          "contributes_mass": true
+        },
+        {
+          "kind": "box",
+          "extents": [
+            0.048,
+            0.083,
+            0.0625
+          ],
+          "relative_pose": {
+            "pos": [
+              0.094,
+              0,
+              -0.02925
+            ]
+          },
+          "rgba": "0.16 0.16 0.18 1",
+          "visible": false,
+          "collision": true,
+          "contributes_mass": true
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_body.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.42 0.44 0.48 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_bezel.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.06 0.06 0.07 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_screen.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.04 0.10 0.28 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_pad.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.85 0.40 0.22 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_buttons.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.55 0.57 0.62 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        },
+        {
+          "kind": "mesh",
+          "mesh_file": "assets/dx8000/dx8000_details.stl",
+          "mesh_scale": [
+            1,
+            1,
+            1
+          ],
+          "rgba": "0.02 0.02 0.02 1",
+          "collision": false,
+          "visible": true,
+          "contributes_mass": false
+        }
+      ]
+    }
+  ],
+  "params": {
+    "screen_width_m": 0.068,
+    "screen_height_m": 0.136,
+    "resolution_x": 720,
+    "resolution_y": 1440,
+    "screen_plane_z_m": 0.0,
+    "body_length_m": 0.198,
+    "body_width_m": 0.083,
+    "body_thickness_m": 0.0625,
+    "screen_slab_thickness_m": 0.025,
+    "screen_bezel_bottom_m": 0.012,
+    "screen_bezel_head_m": 0.002,
+    "head_length_m": 0.048,
+    "head_height_above_screen_m": 0.002,
+    "head_depth_below_screen_m": 0.0605,
+    "card_slot_x_m": -0.08,
+    "card_slot_z_m": -0.0125,
+    "card_slot_width_m": 0.054
+  },
+  "connectors": [
+    {
+      "name": "nest",
+      "type": "bolt_m3",
+      "pose": {
+        "pos": [
+          0.094,
+          0,
+          -0.0605
+        ],
+        "rot": [
+          180,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "top",
+      "type": "bolt_m3",
+      "pose": {
+        "pos": [
+          0.094,
+          0,
+          0.002
+        ]
+      }
+    }
+  ]
+}

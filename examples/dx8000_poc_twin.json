@@ -1,0 +1,319 @@
+{
+  "schema_version": "0.1",
+  "name": "dx8000_poc_twin",
+  "description": "DX8000 proxy on the phone gantry rig: 3-axis gantry + touch finger. Root origin at screen centre; head extends +X and +Z.",
+  "parts": [
+    {
+      "id": "deck",
+      "part": "beam_2020_400",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "standoff1",
+      "part": "corner_bracket_2020",
+      "pose": {}
+    },
+    {
+      "id": "standoff2",
+      "part": "corner_bracket_2020",
+      "pose": {}
+    },
+    {
+      "id": "rail",
+      "part": "mgn12_rail_400",
+      "pose": {}
+    },
+    {
+      "id": "x_carriage",
+      "part": "mgn12_carriage",
+      "pose": {}
+    },
+    {
+      "id": "rail_y",
+      "part": "mgn12_rail_400",
+      "pose": {}
+    },
+    {
+      "id": "y_leadscrew",
+      "part": "nema17_leadscrew_t8",
+      "pose": {}
+    },
+    {
+      "id": "y_nut",
+      "part": "leadscrew_nut_guided_t8",
+      "pose": {}
+    },
+    {
+      "id": "finger",
+      "part": "touch_finger",
+      "pose": {}
+    },
+    {
+      "id": "phone_plate",
+      "part": "motor_mount_plate_2020",
+      "pose": {}
+    },
+    {
+      "id": "dut",
+      "part": "dx8000",
+      "pose": {}
+    },
+    {
+      "id": "motor_left",
+      "part": "nema17_stepper",
+      "pose": {}
+    },
+    {
+      "id": "motor_right",
+      "part": "nema17_stepper",
+      "pose": {}
+    },
+    {
+      "id": "motor_plate_left",
+      "part": "motor_mount_plate_2020",
+      "pose": {}
+    },
+    {
+      "id": "motor_plate_right",
+      "part": "motor_mount_plate_2020",
+      "pose": {}
+    },
+    {
+      "id": "pulley_left",
+      "part": "gt2_pulley_20t",
+      "pose": {}
+    },
+    {
+      "id": "pulley_right",
+      "part": "gt2_pulley_20t",
+      "pose": {}
+    },
+    {
+      "id": "belt",
+      "part": "gt2_belt_400",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "phone_plate_on_deck",
+      "part_a": "deck",
+      "connector_a": "top_mid",
+      "part_b": "phone_plate",
+      "connector_b": "tslot"
+    },
+    {
+      "id": "phone_on_plate",
+      "part_a": "phone_plate",
+      "connector_a": "motor_face",
+      "part_b": "dut",
+      "connector_b": "nest"
+    },
+    {
+      "id": "standoff1_on_deck",
+      "part_a": "deck",
+      "connector_a": "top_a",
+      "part_b": "standoff1",
+      "connector_b": "side_a"
+    },
+    {
+      "id": "standoff2_on_standoff1",
+      "part_a": "standoff1",
+      "connector_a": "side_b",
+      "part_b": "standoff2",
+      "connector_b": "side_a"
+    },
+    {
+      "id": "rail_on_standoff",
+      "part_a": "standoff2",
+      "connector_a": "side_b",
+      "part_b": "rail",
+      "connector_b": "mount"
+    },
+    {
+      "id": "carriage_on_rail",
+      "part_a": "rail",
+      "connector_a": "carriage_top",
+      "part_b": "x_carriage",
+      "connector_b": "rail_side"
+    },
+    {
+      "id": "rail_y_on_carriage",
+      "part_a": "x_carriage",
+      "connector_a": "top",
+      "part_b": "rail_y",
+      "connector_b": "mount_yaw90"
+    },
+    {
+      "id": "y_leadscrew_on_rail_end",
+      "part_a": "rail_y",
+      "connector_a": "end_b",
+      "part_b": "y_leadscrew",
+      "connector_b": "mount_yaw90"
+    },
+    {
+      "id": "y_nut_on_rail_y",
+      "part_a": "rail_y",
+      "connector_a": "carriage_top",
+      "part_b": "y_nut",
+      "connector_b": "rail_side"
+    },
+    {
+      "id": "y_nut_on_screw",
+      "part_a": "y_leadscrew",
+      "connector_a": "screw",
+      "part_b": "y_nut",
+      "connector_b": "thread"
+    },
+    {
+      "id": "finger_on_nut",
+      "part_a": "y_nut",
+      "connector_a": "mount",
+      "part_b": "finger",
+      "connector_b": "mount"
+    },
+    {
+      "id": "motor_plate_left_on_deck",
+      "part_a": "deck",
+      "connector_a": "end_a",
+      "part_b": "motor_plate_left",
+      "connector_b": "tslot"
+    },
+    {
+      "id": "motor_left_on_plate",
+      "part_a": "motor_plate_left",
+      "connector_a": "motor_face",
+      "part_b": "motor_left",
+      "connector_b": "mount"
+    },
+    {
+      "id": "motor_plate_right_on_deck",
+      "part_a": "deck",
+      "connector_a": "end_b",
+      "part_b": "motor_plate_right",
+      "connector_b": "tslot"
+    },
+    {
+      "id": "motor_right_on_plate",
+      "part_a": "motor_plate_right",
+      "connector_a": "motor_face",
+      "part_b": "motor_right",
+      "connector_b": "mount"
+    },
+    {
+      "id": "pulley_left_on_shaft",
+      "part_a": "motor_left",
+      "connector_a": "shaft",
+      "part_b": "pulley_left",
+      "connector_b": "bore"
+    },
+    {
+      "id": "pulley_right_on_shaft",
+      "part_a": "motor_right",
+      "connector_a": "shaft",
+      "part_b": "pulley_right",
+      "connector_b": "bore"
+    },
+    {
+      "id": "belt_left",
+      "part_a": "belt",
+      "connector_a": "end_a",
+      "part_b": "pulley_left",
+      "connector_b": "belt"
+    },
+    {
+      "id": "belt_right",
+      "part_a": "belt",
+      "connector_a": "end_b",
+      "part_b": "pulley_right",
+      "connector_b": "belt"
+    },
+    {
+      "id": "belt_clamp",
+      "part_a": "x_carriage",
+      "connector_a": "belt_clamp",
+      "part_b": "belt",
+      "connector_b": "clamp"
+    }
+  ],
+  "boards": [
+    {
+      "id": "main",
+      "type": "skr-pico"
+    }
+  ],
+  "wiring": [
+    {
+      "component": "motor_left",
+      "signal": "step",
+      "board": "main",
+      "pin": "P2_2"
+    },
+    {
+      "component": "motor_left",
+      "signal": "dir",
+      "board": "main",
+      "pin": "P2_6"
+    },
+    {
+      "component": "motor_left",
+      "signal": "enable",
+      "board": "main",
+      "pin": "P2_1"
+    },
+    {
+      "component": "motor_right",
+      "signal": "step",
+      "board": "main",
+      "pin": "P6_2"
+    },
+    {
+      "component": "motor_right",
+      "signal": "dir",
+      "board": "main",
+      "pin": "P6_6"
+    },
+    {
+      "component": "motor_right",
+      "signal": "enable",
+      "board": "main",
+      "pin": "P6_1"
+    },
+    {
+      "component": "y_leadscrew",
+      "signal": "step",
+      "board": "main",
+      "pin": "P4_2"
+    },
+    {
+      "component": "y_leadscrew",
+      "signal": "dir",
+      "board": "main",
+      "pin": "P4_6"
+    },
+    {
+      "component": "y_leadscrew",
+      "signal": "enable",
+      "board": "main",
+      "pin": "P4_1"
+    },
+    {
+      "component": "finger",
+      "signal": "pwm",
+      "board": "main",
+      "pin": "P1_1"
+    }
+  ]
+}

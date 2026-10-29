@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1",
+  "name": "dx8000_only",
+  "description": "DX8000 digital-twin proxy alone, root at screen centre, screen normal +Z.",
+  "parts": [
+    { "id": "dx8000", "part": "dx8000", "pose": { "pos": [0, 0, 0] } }
+  ]
+}
