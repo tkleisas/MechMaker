@@ -3,7 +3,11 @@ namespace MechMaker.Engine;
 public enum SceneShapeKind
 {
     Box,
-    Cylinder
+    Cylinder,
+    Sphere,
+    Capsule,
+    Ellipsoid,
+    Mesh
 }
 
 /// <summary>A visual primitive in world coordinates — the unit the renderer consumes.</summary>
@@ -19,4 +23,7 @@ public readonly record struct SceneShape(
     double R00, double R01, double R02,
     double R10, double R11, double R12,
     double R20, double R21, double R22,
-    double R, double G, double B, double A);
+    double R, double G, double B, double A,
+    string? MeshFile = null,
+    double MeshScaleX = 1, double MeshScaleY = 1, double MeshScaleZ = 1,
+    double MeshCenterX = 0, double MeshCenterY = 0, double MeshCenterZ = 0);

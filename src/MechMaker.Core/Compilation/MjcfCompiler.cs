@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Xml.Linq;
+using MechMaker.Core.Geometry;
 using MechMaker.Core.Mathematics;
 using MechMaker.Core.Model;
 using MechMaker.Core.Parametric;
@@ -41,8 +42,10 @@ public sealed class MjcfCompiler(PartCatalog catalog)
     // Per-compile state.
     private XDocument _document = null!;
     private XElement _worldbody = null!;
+    private XElement _assetHost = null!;
     private XElement _equalityHost = null!;
     private XElement _actuatorHost = null!;
+    private Dictionary<(string Instance, string Body, int Shape), MeshAsset> _meshAssets = null!;
     private Dictionary<string, PartDefinition> _definitionOf = null!;
     private Dictionary<string, Transform> _bodyWorld = null!;
     private Dictionary<string, XElement> _bodyElement = null!;
@@ -67,8 +70,12 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         _bodyWorld = [];
         _bodyElement = [];
         _drivingJointOf = [];
+        _meshAssets = [];
 
         CreateDocument(machine);
+        PrepareMeshes(machine);
+        if (_report.HasErrors)
+            throw new MjcfCompileException(_report);
         BuildTree(machine);
         EmitBelts(machine);
         EmitScrews(machine);
@@ -95,6 +102,7 @@ public sealed class MjcfCompiler(PartCatalog catalog)
                 new XElement("visual",
                     new XElement("headlight", new XAttribute("diffuse", "0.6 0.6 0.6"),
                         new XAttribute("ambient", "0.3 0.3 0.3"))),
+                new XElement("asset"),
                 new XElement("worldbody",
                     new XElement("geom", new XAttribute("name", "ground"),
                         new XAttribute("type", "plane"), new XAttribute("size", "2 2 0.05"),
@@ -106,9 +114,93 @@ public sealed class MjcfCompiler(PartCatalog catalog)
                 new XElement("equality"),
                 new XElement("actuator")));
 
+        _assetHost = _document.Root!.Element("asset")!;
         _worldbody = _document.Root!.Element("worldbody")!;
         _equalityHost = _document.Root.Element("equality")!;
         _actuatorHost = _document.Root.Element("actuator")!;
+    }
+
+    // ---------- mesh assets ----------
+
+    private sealed record MeshAsset(string Name, string File, Vec3 Scale, MeshGeometry Geometry);
+
+    /// <summary>
+    /// Resolves every mesh shape to an absolute file, loads it once for volume/AABB,
+    /// and emits the matching MJCF &lt;asset&gt;&lt;mesh&gt; entry. Meshes are emitted
+    /// before the body tree because MJCF requires assets to precede the worldbody.
+    /// </summary>
+    private void PrepareMeshes(MachineDefinition machine)
+    {
+        foreach (var instance in machine.Parts)
+        {
+            var definition = _definitionOf[instance.Id];
+            foreach (var body in definition.Bodies)
+            {
+                for (var i = 0; i < body.Shapes.Count; i++)
+                {
+                    var shape = body.Shapes[i];
+                    if (shape.Kind != ShapeKind.Mesh)
+                        continue;
+
+                    if (string.IsNullOrWhiteSpace(shape.MeshFile))
+                    {
+                        _report.AddError("mm042",
+                            $"Part '{instance.Id}' body '{body.Name}' shape {i}: mesh shape needs 'mesh_file'.",
+                            instance.Id);
+                        continue;
+                    }
+
+                    var file = ResolveMeshPath(shape.MeshFile);
+                    MeshGeometry geometry;
+                    try
+                    {
+                        geometry = MeshGeometry.Load(file, shape.MeshScale);
+                        file = MeshGeometry.EnsureMujocoCompatible(file);
+                    }
+                    catch (Exception e) when (e is not OutOfMemoryException)
+                    {
+                        _report.AddError("mm042",
+                            $"Part '{instance.Id}' body '{body.Name}' shape {i}: {e.Message}",
+                            instance.Id);
+                        continue;
+                    }
+
+                    var name = MeshAssetName(instance.Id, body.Name, i);
+                    var asset = new MeshAsset(name, file, shape.MeshScale, geometry);
+                    _meshAssets[(instance.Id, body.Name, i)] = asset;
+
+                    var element = new XElement("mesh",
+                        new XAttribute("name", name),
+                        new XAttribute("file", file));
+                    if (shape.MeshScale != new Vec3(1, 1, 1))
+                        element.SetAttributeValue("scale", Vec(shape.MeshScale));
+                    if (shape.SmoothNormal)
+                        element.SetAttributeValue("smoothnormal", "true");
+                    _assetHost.Add(element);
+
+                    if (geometry.Volume <= 1e-12)
+                        _report.AddWarning("mm043",
+                            $"Mesh '{shape.MeshFile}' for '{instance.Id}' has zero/near-zero signed volume " +
+                            "(open or non-watertight); mass is estimated from its bounding box.",
+                            instance.Id);
+                }
+            }
+        }
+    }
+
+    private string ResolveMeshPath(string file)
+    {
+        if (Path.IsPathRooted(file))
+            return Path.GetFullPath(file);
+        var root = catalog.RootDirectory ?? Directory.GetCurrentDirectory();
+        return Path.GetFullPath(Path.Combine(root, file));
+    }
+
+    private static string MeshAssetName(string instanceId, string bodyName, int shapeIndex)
+    {
+        static string Safe(string value) =>
+            new(value.Select(c => char.IsLetterOrDigit(c) || c is '_' or '-' ? c : '_').ToArray());
+        return $"mesh_{Safe(instanceId)}_{Safe(bodyName)}_{shapeIndex}";
     }
 
     // ---------- body tree ----------
@@ -169,7 +261,8 @@ public sealed class MjcfCompiler(PartCatalog catalog)
     /// <summary>
     /// Detects parts that mate at connector points but whose bodies never come
     /// within 2 mm of each other — "magically floating" components. Rotation-aware:
-    /// cylinders contribute radius on X/Y and half-length on Z of their local OBB.
+    /// each shape contributes its local OBB (cylinder/capsule axis = Z, mesh = loaded
+    /// bounding box), so rotated parts are compared in world space.
     /// Transmission elements are exempt: the belt's schematic strap spans between
     /// the pulleys by construction (mm021 covers missing pulleys).
     /// </summary>
@@ -188,12 +281,11 @@ public sealed class MjcfCompiler(PartCatalog catalog)
             {
                 if (!_bodyWorld.TryGetValue(Key(instance.Id, body.Name), out var bodyWorld))
                     continue;
-                foreach (var shape in body.Shapes)
+                for (var shapeIndex = 0; shapeIndex < body.Shapes.Count; shapeIndex++)
                 {
+                    var shape = body.Shapes[shapeIndex];
                     var world = bodyWorld * ToTransform(shape.RelativePose);
-                    var (hx, hy, hz) = shape.Kind == ShapeKind.Cylinder
-                        ? (shape.Extents.X, shape.Extents.X, shape.Extents.Y / 2)
-                        : (shape.Extents.X / 2, shape.Extents.Y / 2, shape.Extents.Z / 2);
+                    var (hx, hy, hz) = ShapeHalfExtents(shape, instance.Id, body.Name, shapeIndex);
                     var r = world.Rotation;
                     var c1 = r.Rotate(Vec3.UnitX);
                     var c2 = r.Rotate(Vec3.UnitY);
@@ -363,7 +455,7 @@ public sealed class MjcfCompiler(PartCatalog catalog)
             _bodyWorld[Key(instanceId, body.Name)] = world;
             _bodyElement[Key(instanceId, body.Name)] = element;
 
-            foreach (var geom in GeomsFor(body, $"{instanceId}_{body.Name}"))
+            foreach (var geom in GeomsFor(body, $"{instanceId}_{body.Name}", instanceId))
                 element.Add(geom);
 
             if (body.Actuated != JointActuation.None)
@@ -712,22 +804,38 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         return d.ToString("0.######", CultureInfo.InvariantCulture);
     }
 
-    private static IEnumerable<XElement> GeomsFor(PartBody body, string prefix)
+    private IEnumerable<XElement> GeomsFor(PartBody body, string prefix, string instanceId)
     {
-        var volumes = body.Shapes.Select(ShapeVolume).ToList();
+        var volumes = new List<double>(body.Shapes.Count);
+        for (var i = 0; i < body.Shapes.Count; i++)
+            volumes.Add(body.Shapes[i].ContributesMass
+                ? ShapeVolume(body.Shapes[i], instanceId, body.Name, i)
+                : 0);
         var total = volumes.Sum();
-        if (total <= 0) total = 1;
+        if (total <= 1e-15)
+        {
+            // No shape declared mass, or all volumes are degenerate: fall back to
+            // equal weights so the body still has the authored mass.
+            volumes = Enumerable.Repeat(1.0, body.Shapes.Count).ToList();
+            total = Math.Max(1, body.Shapes.Count);
+        }
+
         for (var i = 0; i < body.Shapes.Count; i++)
         {
             var shape = body.Shapes[i];
             var geom = new XElement("geom", new XAttribute("name", $"{prefix}_g{i}"),
-                new XAttribute("rgba", shape.Rgba),
-                new XAttribute("mass", Num(body.MassKg * volumes[i] / total)));
+                new XAttribute("rgba", shape.Visible ? shape.Rgba : "0 0 0 0"),
+                new XAttribute("mass", Num(shape.ContributesMass ? body.MassKg * volumes[i] / total : 0)));
             var pose = shape.RelativePose;
             if (pose.Position != Vec3.Zero)
                 geom.SetAttributeValue("pos", Vec(pose.Position));
             if (pose.RotationEulerDeg != Vec3.Zero)
                 geom.SetAttributeValue("quat", QuatAttr(pose.Rotation));
+            if (!shape.Collision)
+            {
+                geom.SetAttributeValue("contype", "0");
+                geom.SetAttributeValue("conaffinity", "0");
+            }
 
             switch (shape.Kind)
             {
@@ -739,6 +847,25 @@ public sealed class MjcfCompiler(PartCatalog catalog)
                     geom.SetAttributeValue("type", "cylinder");
                     geom.SetAttributeValue("size", $"{Num(shape.Extents.X)} {Num(shape.Extents.Y / 2)}");
                     break;
+                case ShapeKind.Sphere:
+                    geom.SetAttributeValue("type", "sphere");
+                    geom.SetAttributeValue("size", Num(shape.Extents.X));
+                    break;
+                case ShapeKind.Capsule:
+                    geom.SetAttributeValue("type", "capsule");
+                    geom.SetAttributeValue("size", $"{Num(shape.Extents.X)} {Num(shape.Extents.Y / 2)}");
+                    break;
+                case ShapeKind.Ellipsoid:
+                    geom.SetAttributeValue("type", "ellipsoid");
+                    geom.SetAttributeValue("size", $"{Num(shape.Extents.X)} {Num(shape.Extents.Y)} {Num(shape.Extents.Z)}");
+                    break;
+                case ShapeKind.Mesh:
+                    if (!_meshAssets.TryGetValue((instanceId, body.Name, i), out var asset))
+                        throw new MjcfCompileException(Error("mm042",
+                            $"Mesh asset missing for '{instanceId}' body '{body.Name}' shape {i}.", instanceId));
+                    geom.SetAttributeValue("type", "mesh");
+                    geom.SetAttributeValue("mesh", asset.Name);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(shape.Kind), shape.Kind, null);
             }
@@ -746,10 +873,48 @@ public sealed class MjcfCompiler(PartCatalog catalog)
         }
     }
 
-    private static double ShapeVolume(Shape shape) => shape.Kind switch
+    private double ShapeVolume(Shape shape, string instanceId, string bodyName, int shapeIndex)
     {
-        ShapeKind.Box => shape.Extents.X * shape.Extents.Y * shape.Extents.Z,
-        ShapeKind.Cylinder => Math.PI * shape.Extents.X * shape.Extents.X * shape.Extents.Y,
-        _ => 0
-    };
+        var volume = shape.Kind switch
+        {
+            ShapeKind.Box => shape.Extents.X * shape.Extents.Y * shape.Extents.Z,
+            ShapeKind.Cylinder => Math.PI * shape.Extents.X * shape.Extents.X * shape.Extents.Y,
+            ShapeKind.Sphere => 4.0 / 3.0 * Math.PI * Math.Pow(shape.Extents.X, 3),
+            ShapeKind.Capsule => Math.PI * shape.Extents.X * shape.Extents.X * shape.Extents.Y
+                                 + 4.0 / 3.0 * Math.PI * Math.Pow(shape.Extents.X, 3),
+            ShapeKind.Ellipsoid => 4.0 / 3.0 * Math.PI * shape.Extents.X * shape.Extents.Y * shape.Extents.Z,
+            ShapeKind.Mesh => MeshVolume(instanceId, bodyName, shapeIndex),
+            _ => 0
+        };
+        return Math.Max(0, volume);
+    }
+
+    private double MeshVolume(string instanceId, string bodyName, int shapeIndex)
+    {
+        if (!_meshAssets.TryGetValue((instanceId, bodyName, shapeIndex), out var asset))
+            return 0;
+        return asset.Geometry.Volume > 1e-12
+            ? asset.Geometry.Volume
+            : asset.Geometry.BoundingVolume * 0.5;
+    }
+
+    private (double Hx, double Hy, double Hz) ShapeHalfExtents(Shape shape, string instanceId, string bodyName, int shapeIndex)
+        => shape.Kind switch
+        {
+            ShapeKind.Box => (shape.Extents.X / 2, shape.Extents.Y / 2, shape.Extents.Z / 2),
+            ShapeKind.Cylinder => (shape.Extents.X, shape.Extents.X, shape.Extents.Y / 2),
+            ShapeKind.Sphere => (shape.Extents.X, shape.Extents.X, shape.Extents.X),
+            ShapeKind.Capsule => (shape.Extents.X, shape.Extents.X, shape.Extents.Y / 2 + shape.Extents.X),
+            ShapeKind.Ellipsoid => (shape.Extents.X, shape.Extents.Y, shape.Extents.Z),
+            ShapeKind.Mesh => MeshHalfExtents(instanceId, bodyName, shapeIndex),
+            _ => (0, 0, 0)
+        };
+
+    private (double Hx, double Hy, double Hz) MeshHalfExtents(string instanceId, string bodyName, int shapeIndex)
+    {
+        if (!_meshAssets.TryGetValue((instanceId, bodyName, shapeIndex), out var asset))
+            return (0, 0, 0);
+        var size = asset.Geometry.Size;
+        return (size.X / 2, size.Y / 2, size.Z / 2);
+    }
 }

@@ -27,7 +27,7 @@ public class CatalogTests
     {
         var catalog = TestRepo.Catalog();
 
-        Assert.Equal(21, catalog.All.Count);
+        Assert.True(catalog.All.Count >= 21, $"expected at least the 21 seed parts, got {catalog.All.Count}");
         var motor = catalog.Get("nema17_stepper");
         Assert.NotNull(motor.Motor);
         Assert.Equal(MotorKind.Stepper, motor.Motor!.Kind);

@@ -47,6 +47,9 @@ What works today:
   (with reflected rotor inertia), belt couplers (pulleys mirrored; belt-clamped parts
   ride the belt at pitch_radius × pulley angle), leadscrew couplers (nut = lead/(2π)
   per rotor radian), and gear-mesh couplers (ratio = pitch-radius ratio).
+- **Shapes**: box, cylinder, sphere, capsule, ellipsoid and STL/OBJ mesh, with
+  compound bodies, per-shape mass by volume, visual-only geoms and AABB/volume
+  validation. See [docs/shapes.md](docs/shapes.md).
 - **Physics runtime** (`MechMaker.Engine`): native MuJoCo 3.11, 8 kHz fixed timestep,
   bitwise deterministic.
 - **Virtual MCU + stepper model**: one channel per wired motor; commands ramp at an

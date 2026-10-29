@@ -58,11 +58,59 @@ public sealed class MachineValidator(PartCatalog catalog)
             }
             try
             {
-                ResolvedParts.Materialize(definition, instance.Params, instance.Id);
+                var resolved = ResolvedParts.Materialize(definition, instance.Params, instance.Id);
+                CheckShapes(instance, resolved, report);
             }
             catch (ParamEvalException e)
             {
                 report.AddError("mm040", e.Message, instance.Id);
+            }
+        }
+    }
+
+    /// <summary>Shape-level sanity: positive dimensions and resolvable mesh files.</summary>
+    private void CheckShapes(PartInstance instance, PartDefinition definition, ValidationReport report)
+    {
+        foreach (var body in definition.Bodies)
+        {
+            for (var i = 0; i < body.Shapes.Count; i++)
+            {
+                var shape = body.Shapes[i];
+                var where = $"Part '{instance.Id}' body '{body.Name}' shape {i}";
+                switch (shape.Kind)
+                {
+                    case ShapeKind.Box:
+                        if (shape.Extents.X <= 0 || shape.Extents.Y <= 0 || shape.Extents.Z <= 0)
+                            report.AddError("mm044", $"{where}: box extents must be positive.", instance.Id);
+                        break;
+                    case ShapeKind.Cylinder:
+                    case ShapeKind.Capsule:
+                        if (shape.Extents.X <= 0 || shape.Extents.Y <= 0)
+                            report.AddError("mm044", $"{where}: radius and length must be positive.", instance.Id);
+                        break;
+                    case ShapeKind.Sphere:
+                        if (shape.Extents.X <= 0)
+                            report.AddError("mm044", $"{where}: sphere radius must be positive.", instance.Id);
+                        break;
+                    case ShapeKind.Ellipsoid:
+                        if (shape.Extents.X <= 0 || shape.Extents.Y <= 0 || shape.Extents.Z <= 0)
+                            report.AddError("mm044", $"{where}: ellipsoid radii must be positive.", instance.Id);
+                        break;
+                    case ShapeKind.Mesh:
+                        if (string.IsNullOrWhiteSpace(shape.MeshFile))
+                        {
+                            report.AddError("mm042", $"{where}: mesh shape needs 'mesh_file'.", instance.Id);
+                            break;
+                        }
+                        if (shape.MeshScale.X == 0 || shape.MeshScale.Y == 0 || shape.MeshScale.Z == 0)
+                            report.AddError("mm044", $"{where}: mesh scale components must be non-zero.", instance.Id);
+                        var path = Path.IsPathRooted(shape.MeshFile)
+                            ? shape.MeshFile
+                            : Path.Combine(catalog.RootDirectory ?? Directory.GetCurrentDirectory(), shape.MeshFile);
+                        if (!File.Exists(path))
+                            report.AddError("mm042", $"{where}: mesh file not found: {Path.GetFullPath(path)}", instance.Id);
+                        break;
+                }
             }
         }
     }

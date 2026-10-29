@@ -53,9 +53,22 @@ public static class SceneRenderer
         double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
         foreach (var s in scene)
         {
-            minX = Math.Min(minX, s.Px); maxX = Math.Max(maxX, s.Px);
-            minY = Math.Min(minY, s.Py); maxY = Math.Max(maxY, s.Py);
-            minZ = Math.Min(minZ, s.Pz); maxZ = Math.Max(maxZ, s.Pz);
+            // Rotation-aware AABB from the shape's local half extents. Cylinders and
+            // capsules run along local Z, so their radius occupies X/Y and their
+            // length occupies Z. Mesh shapes carry their mesh AABB in the fields.
+            var (hx, hy, hz) = s.Kind switch
+            {
+                SceneShapeKind.Cylinder => (s.HalfX, s.HalfX, s.HalfY),
+                SceneShapeKind.Capsule => (s.HalfX, s.HalfX, s.HalfY + s.HalfX),
+                SceneShapeKind.Sphere => (s.HalfX, s.HalfX, s.HalfX),
+                _ => (s.HalfX, s.HalfY, s.HalfZ)
+            };
+            var ex = Math.Abs(s.R00) * hx + Math.Abs(s.R01) * hy + Math.Abs(s.R02) * hz;
+            var ey = Math.Abs(s.R10) * hx + Math.Abs(s.R11) * hy + Math.Abs(s.R12) * hz;
+            var ez = Math.Abs(s.R20) * hx + Math.Abs(s.R21) * hy + Math.Abs(s.R22) * hz;
+            minX = Math.Min(minX, s.Px - ex); maxX = Math.Max(maxX, s.Px + ex);
+            minY = Math.Min(minY, s.Py - ey); maxY = Math.Max(maxY, s.Py + ey);
+            minZ = Math.Min(minZ, s.Pz - ez); maxZ = Math.Max(maxZ, s.Pz + ez);
         }
         camera.TargetX = (minX + maxX) / 2;
         camera.TargetY = (minY + maxY) / 2;

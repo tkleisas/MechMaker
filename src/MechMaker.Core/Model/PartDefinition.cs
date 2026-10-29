@@ -17,21 +17,50 @@ public enum PartCategory
 public enum ShapeKind
 {
     Box,
-    Cylinder
+    Cylinder,
+    Sphere,
+    Capsule,
+    Ellipsoid,
+    Mesh
 }
 
-/// <summary>Primitive collision/visual geometry, posed relative to its body.</summary>
+/// <summary>Primitive, mesh, or compound collision/visual geometry, posed relative to its body.
+/// Compounds are expressed as several shapes on one body (the existing model).</summary>
 public sealed record Shape
 {
     public ShapeKind Kind { get; init; } = ShapeKind.Box;
 
-    /// <summary>Full extents for boxes; for cylinders Radius/Length are read from Extents.X / Extents.Y.
+    /// <summary>Shape dimensions. Box: full X/Y/Z extents. Cylinder: radius = X, length = Y.
+    /// Sphere: radius = X. Capsule: radius = X, cylindrical length = Y. Ellipsoid: radii = X/Y/Z.
+    /// Mesh: ignored; use <see cref="MeshFile"/> and <see cref="MeshScale"/>.
     /// Materialized value: the default when <see cref="ExtentsExpr"/> is null, else the expression result.</summary>
     public Vec3 Extents { get; init; } = new(0.01, 0.01, 0.01);
 
     /// <summary>Parametric extents: three expressions ("length_m/2", "0.006"...) overriding
     /// <see cref="Extents"/> per instance. Present only on parametric shapes.</summary>
     public string[]? ExtentsExpr { get; init; }
+
+    /// <summary>Mesh file (STL or OBJ), relative to the catalog directory or absolute.
+    /// Used when <see cref="Kind"/> is <see cref="ShapeKind.Mesh"/>.</summary>
+    public string? MeshFile { get; init; }
+
+    /// <summary>Per-axis scale applied to the mesh file before collision/rendering. Metres per file unit.
+    /// For a millimetre STL use (0.001, 0.001, 0.001).</summary>
+    public Vec3 MeshScale { get; init; } = new(1, 1, 1);
+
+    /// <summary>False for visual-only geometry (no collision). MuJoCo still renders it.</summary>
+    public bool Collision { get; init; } = true;
+
+    /// <summary>False for a collision-only proxy hidden from the renderer and viewer.
+    /// The geom still participates in contacts and mass.</summary>
+    public bool Visible { get; init; } = true;
+
+    /// <summary>False for a visual shell that duplicates a simpler collision proxy:
+    /// the geom is emitted with mass 0 and excluded from mass/volume distribution.</summary>
+    public bool ContributesMass { get; init; } = true;
+
+    /// <summary>Use smooth vertex normals for mesh rendering instead of flat face normals.</summary>
+    public bool SmoothNormal { get; init; }
 
     public Pose RelativePose { get; init; } = Pose.Identity;
 

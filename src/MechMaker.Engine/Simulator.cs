@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml.Linq;
 using Evergine.Bindings.MuJoCo;
+using MechMaker.Core.Geometry;
+using MechMaker.Core.Mathematics;
 
 namespace MechMaker.Engine;
 
@@ -15,11 +17,14 @@ public sealed unsafe class Simulator : IDisposable
 
     private mjModel* _model;
     private mjData* _data;
+    private readonly Dictionary<string, MeshAssetRef> _meshAssets;
+    private readonly record struct MeshAssetRef(string File, double Sx, double Sy, double Sz);
 
-    private Simulator(mjModel* model, double timestep)
+    private Simulator(mjModel* model, double timestep, Dictionary<string, MeshAssetRef>? meshAssets = null)
     {
         _model = model;
         Timestep = timestep;
+        _meshAssets = meshAssets ?? [];
         _data = MuJoCo.mj_makeData(model);
         if (_data is null)
             throw new InvalidOperationException("MuJoCo failed to allocate simulation data.");
@@ -37,7 +42,39 @@ public sealed unsafe class Simulator : IDisposable
         var model = MuJoCo.mj_loadXML(path, null, error, 1024);
         if (model is null)
             throw new InvalidOperationException(LastError(error));
-        return new Simulator(model, ReadTimestep(path));
+        return new Simulator(model, ReadTimestep(path), ReadMeshAssets(path));
+    }
+
+    private static Dictionary<string, MeshAssetRef> ReadMeshAssets(string mjcfPath)
+    {
+        var map = new Dictionary<string, MeshAssetRef>(StringComparer.Ordinal);
+        var asset = XDocument.Load(mjcfPath).Root?.Element("asset");
+        if (asset is null)
+            return map;
+        var baseDir = Path.GetDirectoryName(Path.GetFullPath(mjcfPath)) ?? Directory.GetCurrentDirectory();
+        foreach (var mesh in asset.Elements("mesh"))
+        {
+            var name = (string?)mesh.Attribute("name");
+            var file = (string?)mesh.Attribute("file");
+            if (name is null || file is null)
+                continue;
+            if (!Path.IsPathRooted(file))
+                file = Path.GetFullPath(Path.Combine(baseDir, file));
+            var sx = 1.0; var sy = 1.0; var sz = 1.0;
+            var scale = (string?)mesh.Attribute("scale");
+            if (!string.IsNullOrWhiteSpace(scale))
+            {
+                var parts = scale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 3)
+                {
+                    sx = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+                    sy = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                    sz = double.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+            map[name] = new MeshAssetRef(file, sx, sy, sz);
+        }
+        return map;
     }
 
     public static Simulator FromMjcf(string xml)
@@ -247,35 +284,130 @@ public sealed unsafe class Simulator : IDisposable
     /// <summary>All visual geoms with world pose, size, and color.</summary>
     public IReadOnlyList<SceneShape> GetScene()
     {
+        RefreshKinematics();
         var shapes = new List<SceneShape>((int)_model->ngeom);
         for (var i = 0; i < _model->ngeom; i++)
         {
+            if (_model->geom_rgba[i * 4 + 3] <= 0.001)
+                continue; // collision-only proxy
             var type = (mjtGeom)_model->geom_type[i];
-            if (type is not (mjtGeom.mjGEOM_BOX or mjtGeom.mjGEOM_CYLINDER))
-                continue;
+            SceneShapeKind kind;
+            double hx, hy, hz;
+            string? meshFile = null;
+            double sx = 1, sy = 1, sz = 1;
+            double mcx = 0, mcy = 0, mcz = 0;
+            var px = _data->geom_xpos[i * 3];
+            var py = _data->geom_xpos[i * 3 + 1];
+            var pz = _data->geom_xpos[i * 3 + 2];
+            var r00 = _data->geom_xmat[i * 9];
+            var r01 = _data->geom_xmat[i * 9 + 1];
+            var r02 = _data->geom_xmat[i * 9 + 2];
+            var r10 = _data->geom_xmat[i * 9 + 3];
+            var r11 = _data->geom_xmat[i * 9 + 4];
+            var r12 = _data->geom_xmat[i * 9 + 5];
+            var r20 = _data->geom_xmat[i * 9 + 6];
+            var r21 = _data->geom_xmat[i * 9 + 7];
+            var r22 = _data->geom_xmat[i * 9 + 8];
+
+            switch (type)
+            {
+                case mjtGeom.mjGEOM_BOX:
+                    kind = SceneShapeKind.Box;
+                    hx = _model->geom_size[i * 3];
+                    hy = _model->geom_size[i * 3 + 1];
+                    hz = _model->geom_size[i * 3 + 2];
+                    break;
+                case mjtGeom.mjGEOM_CYLINDER:
+                    kind = SceneShapeKind.Cylinder;
+                    hx = _model->geom_size[i * 3];
+                    hy = _model->geom_size[i * 3 + 1];
+                    hz = 0;
+                    break;
+                case mjtGeom.mjGEOM_SPHERE:
+                    kind = SceneShapeKind.Sphere;
+                    hx = _model->geom_size[i * 3];
+                    hy = hz = 0;
+                    break;
+                case mjtGeom.mjGEOM_CAPSULE:
+                    kind = SceneShapeKind.Capsule;
+                    hx = _model->geom_size[i * 3];
+                    hy = _model->geom_size[i * 3 + 1];
+                    hz = 0;
+                    break;
+                case mjtGeom.mjGEOM_ELLIPSOID:
+                    kind = SceneShapeKind.Ellipsoid;
+                    hx = _model->geom_size[i * 3];
+                    hy = _model->geom_size[i * 3 + 1];
+                    hz = _model->geom_size[i * 3 + 2];
+                    break;
+                case mjtGeom.mjGEOM_MESH:
+                    kind = SceneShapeKind.Mesh;
+                    var meshId = _model->geom_dataid[i];
+                    var meshName = Marshal.PtrToStringUTF8((IntPtr)MuJoCo.mj_id2name(_model, (int)mjtObj.mjOBJ_MESH, meshId));
+                    if (meshName is not null && _meshAssets.TryGetValue(meshName, out var asset))
+                    {
+                        meshFile = asset.File;
+                        sx = asset.Sx; sy = asset.Sy; sz = asset.Sz;
+                        var geo = MeshGeometry.Load(asset.File, new Vec3(sx, sy, sz));
+                        hx = geo.Size.X / 2; hy = geo.Size.Y / 2; hz = geo.Size.Z / 2;
+                        mcx = geo.Center.X; mcy = geo.Center.Y; mcz = geo.Center.Z;
+
+                        // MuJoCo centers mesh assets on their inertia frame. The
+                        // compiled geom_xmat therefore includes that alignment, while
+                        // the source vertices are in the authored frame. Rebuild the
+                        // authored frame from the body pose and the authored geom pose
+                        // so the visual mesh stays where the catalog put it.
+                        var bodyId = _model->geom_bodyid[i];
+                        var bodyT = new Transform(
+                            new Vec3(_data->xpos[bodyId * 3], _data->xpos[bodyId * 3 + 1], _data->xpos[bodyId * 3 + 2]),
+                            new Quat(_data->xquat[bodyId * 4], _data->xquat[bodyId * 4 + 1],
+                                     _data->xquat[bodyId * 4 + 2], _data->xquat[bodyId * 4 + 3]));
+                        var geomT = new Transform(
+                            new Vec3(_model->geom_pos[i * 3], _model->geom_pos[i * 3 + 1], _model->geom_pos[i * 3 + 2]),
+                            new Quat(_model->geom_quat[i * 4], _model->geom_quat[i * 4 + 1],
+                                     _model->geom_quat[i * 4 + 2], _model->geom_quat[i * 4 + 3]));
+                        var meshT = new Transform(
+                            new Vec3(_model->mesh_pos[meshId * 3], _model->mesh_pos[meshId * 3 + 1], _model->mesh_pos[meshId * 3 + 2]),
+                            new Quat(_model->mesh_quat[meshId * 4], _model->mesh_quat[meshId * 4 + 1],
+                                     _model->mesh_quat[meshId * 4 + 2], _model->mesh_quat[meshId * 4 + 3]));
+                        var authored = bodyT * (geomT * meshT.Inverse());
+                        var worldCenter = authored.TransformPoint(new Vec3(mcx, mcy, mcz));
+                        px = worldCenter.X; py = worldCenter.Y; pz = worldCenter.Z;
+                        var q = authored.Rotation;
+                        r00 = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+                        r01 = 2 * (q.X * q.Y - q.W * q.Z);
+                        r02 = 2 * (q.X * q.Z + q.W * q.Y);
+                        r10 = 2 * (q.X * q.Y + q.W * q.Z);
+                        r11 = 1 - 2 * (q.X * q.X + q.Z * q.Z);
+                        r12 = 2 * (q.Y * q.Z - q.W * q.X);
+                        r20 = 2 * (q.X * q.Z - q.W * q.Y);
+                        r21 = 2 * (q.Y * q.Z + q.W * q.X);
+                        r22 = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+                    }
+                    else
+                    {
+                        hx = 0.01; hy = 0.01; hz = 0.01;
+                    }
+                    break;
+                default:
+                    continue;
+            }
 
             shapes.Add(new SceneShape(
-                GeomName(i),
-                type == mjtGeom.mjGEOM_BOX ? SceneShapeKind.Box : SceneShapeKind.Cylinder,
-                _model->geom_size[i * 3],
-                _model->geom_size[i * 3 + 1],
-                _model->geom_size[i * 3 + 2],
-                _data->geom_xpos[i * 3],
-                _data->geom_xpos[i * 3 + 1],
-                _data->geom_xpos[i * 3 + 2],
-                _data->geom_xmat[i * 9],
-                _data->geom_xmat[i * 9 + 1],
-                _data->geom_xmat[i * 9 + 2],
-                _data->geom_xmat[i * 9 + 3],
-                _data->geom_xmat[i * 9 + 4],
-                _data->geom_xmat[i * 9 + 5],
-                _data->geom_xmat[i * 9 + 6],
-                _data->geom_xmat[i * 9 + 7],
-                _data->geom_xmat[i * 9 + 8],
-                _model->geom_rgba[i * 4],
-                _model->geom_rgba[i * 4 + 1],
-                _model->geom_rgba[i * 4 + 2],
-                _model->geom_rgba[i * 4 + 3]));
+                Name: GeomName(i),
+                Kind: kind,
+                HalfX: hx, HalfY: hy, HalfZ: hz,
+                Px: px, Py: py, Pz: pz,
+                R00: r00, R01: r01, R02: r02,
+                R10: r10, R11: r11, R12: r12,
+                R20: r20, R21: r21, R22: r22,
+                R: _model->geom_rgba[i * 4],
+                G: _model->geom_rgba[i * 4 + 1],
+                B: _model->geom_rgba[i * 4 + 2],
+                A: _model->geom_rgba[i * 4 + 3],
+                MeshFile: meshFile,
+                MeshScaleX: sx, MeshScaleY: sy, MeshScaleZ: sz,
+                MeshCenterX: mcx, MeshCenterY: mcy, MeshCenterZ: mcz));
         }
         return shapes;
     }

@@ -8,10 +8,15 @@ public sealed class PartCatalog
 {
     private readonly Dictionary<string, PartDefinition> _parts;
 
-    public PartCatalog(IEnumerable<PartDefinition> parts)
+    public PartCatalog(IEnumerable<PartDefinition> parts, string? rootDirectory = null)
     {
         _parts = parts.ToDictionary(p => p.Id);
+        RootDirectory = rootDirectory;
     }
+
+    /// <summary>Directory the catalog was loaded from, if any. Mesh paths are resolved
+    /// relative to this directory.</summary>
+    public string? RootDirectory { get; }
 
     public IReadOnlyCollection<PartDefinition> All => _parts.Values;
 
@@ -42,6 +47,6 @@ public sealed class PartCatalog
             parts.Add(part);
         }
 
-        return new PartCatalog(parts);
+        return new PartCatalog(parts, Path.GetFullPath(directory));
     }
 }

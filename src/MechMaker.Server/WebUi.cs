@@ -85,10 +85,21 @@ async function load() {
         if (!geo) {
             if (s.k === 0) {
                 geo = new THREE.BoxGeometry(s.h[0] * 2, s.h[1] * 2, s.h[2] * 2);
-            } else {
+            } else if (s.k === 1) {
                 // engine cylinders run along local Z; three.js cylinders along Y
                 geo = new THREE.CylinderGeometry(s.h[0], s.h[0], s.h[1] * 2, 24);
                 geo.rotateX(Math.PI / 2);
+            } else if (s.k === 2) {
+                geo = new THREE.SphereGeometry(s.h[0], 24, 16);
+            } else if (s.k === 3) {
+                geo = new THREE.CapsuleGeometry(s.h[0], s.h[1] * 2, 6, 20);
+                geo.rotateX(Math.PI / 2);
+            } else if (s.k === 4) {
+                geo = new THREE.SphereGeometry(1, 24, 16);
+                geo.scale(s.h[0], s.h[1], s.h[2]);
+            } else {
+                // Mesh: the browser gets the AABB proxy. The native renderer draws real triangles.
+                geo = new THREE.BoxGeometry(s.h[0] * 2, s.h[1] * 2, s.h[2] * 2);
             }
             geoCache.set(key, geo);
         }

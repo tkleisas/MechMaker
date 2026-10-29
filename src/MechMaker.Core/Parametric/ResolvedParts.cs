@@ -50,6 +50,12 @@ public static class ResolvedParts
                     Kind = s.Kind,
                     Extents = s.ExtentsExpr is { } e ? EvalVec(e, resolved, definition.Id, instanceId, $"shape extents") : s.Extents,
                     ExtentsExpr = s.ExtentsExpr,
+                    MeshFile = s.MeshFile,
+                    MeshScale = s.MeshScale,
+                    Collision = s.Collision,
+                    Visible = s.Visible,
+                    ContributesMass = s.ContributesMass,
+                    SmoothNormal = s.SmoothNormal,
                     PosExpr = s.PosExpr,
                     RelativePose = s.PosExpr is { } p
                         ? new Pose { Position = EvalVec(p, resolved, definition.Id, instanceId, "shape position"), RotationEulerDeg = s.RelativePose.RotationEulerDeg }
