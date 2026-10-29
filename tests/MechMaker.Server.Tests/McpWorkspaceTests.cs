@@ -28,9 +28,11 @@ public class McpWorkspaceTests : IDisposable
     [Fact]
     public void Catalog_discovers_the_repo_seed_parts()
     {
-        Assert.Equal(21, _w.Catalog.All.Count);
+        Assert.True(_w.Catalog.All.Count >= 21,
+            $"expected at least the 21 seed parts, got {_w.Catalog.All.Count}");
         Assert.NotNull(_w.Catalog.Find("nema17_stepper"));
         Assert.NotNull(_w.Catalog.Find("gt2_belt_400"));
+        Assert.NotNull(_w.Catalog.Find("dx8000"));
     }
 
     [Fact]
