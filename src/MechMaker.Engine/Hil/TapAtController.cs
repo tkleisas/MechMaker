@@ -141,7 +141,7 @@ public sealed class TapAtController
         servo.SetTargetPositionM(slidePress);
         _simulation.RunFor(0.2);
         servo.SetTargetPositionM(slideRest);
-        _simulation.RunFor(0.10);
+        _simulation.RunFor(0.25); // clear the bridge's 100 ms contact-episode refractory
 
         // The measured contact: where the tip was when it pressed, mapped through
         // the glass.

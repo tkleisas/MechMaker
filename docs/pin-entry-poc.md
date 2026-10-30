@@ -1,0 +1,49 @@
+# PIN-entry POC
+
+Goal: the physical finger on the DX8000 HIL gantry enters a PIN in the emulated
+POS app. Vision finds each keypad key, `tap_at` moves and presses it, and the app
+reports the accepted PIN.
+
+## Components
+
+- `examples/dx8000_hil_rig.json` — DX8000 on the screen-centre mount, 40 mm raised
+  gantry, two-axis gantry and conductive finger.
+- `MechMaker.Hil.FakePinPadTransport` — deterministic 720 x 1440 POS PIN screen
+  (`ENTER PIN`, masked PIN, 1..9 / CLR / 0 / OK). It records accepted taps and
+  exposes `EnteredPin`.
+- `MechMaker.Hil.ScreenDetector` — template matching over the live screencap.
+- `PhysicsTapBridge` / `TapAtController` — physical contact dispatch and gantry
+  motion; the bridge turns a glass contact into an emulator tap.
+- `tests/MechMaker.Server.Tests/PinEntryPocTests.cs` — the end-to-end proof.
+
+## Flow
+
+1. Open the DX8000 HIL rig, connect the emulated app, start the run, arm physics
+   taps.
+2. For each digit, match an independent key template against the live screencap.
+3. `tap_at(match.Fx, match.Fy)` moves the gantry, presses, retracts, and the bridge
+   dispatches the measured contact to the app.
+4. Tap `OK`; assert the app accepted `1234`.
+
+The test uses template matching for the keypad; `TextDetector.ReadWords` is
+available for text fields and key labels when OCR is preferable.
+
+## Run it
+
+```bash
+scripts/test-linux.sh
+# or
+dotnet test tests/MechMaker.Server.Tests/MechMaker.Server.Tests.csproj \
+  --filter FullyQualifiedName~PinEntryPocTests
+```
+
+`scripts/test-linux.sh` runs the Ubuntu 22.04 test container because the
+prebuilt OpenCvSharp/Tesseract natives are jammy-specific.
+
+## Real Android emulator
+
+The fake transport is the deterministic CI stand-in. To run against a real
+emulator, install a test APK with the same keypad screen and connect with
+`HilConnect("adb", ...)`; the HIL session, template matching, `tap_at`, and
+physics bridge are unchanged. The fake and adb transports both work in screen
+fractions, so the same key templates and tap sequence apply.

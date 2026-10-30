@@ -82,6 +82,37 @@ public static class TextDetector
     }
 
     /// <summary>
+    /// Recognises words instead of lines. PIN pads and key grids need one box per
+    /// key, not one box per row; use this when the tap target is a single label.
+    /// </summary>
+    public static IReadOnlyList<ScreenText> ReadWords(byte[] screenPng, double minConfidence = 60,
+        string? charWhitelist = null)
+    {
+        using var engine = new TesseractEngine(TessdataRoot, "eng", EngineMode.Default);
+        engine.DefaultPageSegMode = PageSegMode.SparseText;
+        if (!string.IsNullOrEmpty(charWhitelist))
+            engine.SetVariable("tessedit_char_whitelist", charWhitelist);
+        using var pix = Pix.LoadFromMemory(Preprocess(screenPng));
+        using var page = engine.Process(pix);
+        var results = new List<ScreenText>();
+        using var iterator = page.GetIterator();
+        do
+        {
+            var text = iterator.GetText(PageIteratorLevel.Word);
+            var confidence = iterator.GetConfidence(PageIteratorLevel.Word);
+            if (string.IsNullOrWhiteSpace(text) || confidence < minConfidence)
+                continue;
+            if (!iterator.TryGetBoundingBox(PageIteratorLevel.Word, out var rect))
+                continue;
+            var fx = (pix.Width > 0) ? (rect.X1 + rect.Width / 2.0) / pix.Width : 0;
+            var fy = (pix.Height > 0) ? (rect.Y1 + rect.Height / 2.0) / pix.Height : 0;
+            results.Add(new ScreenText(text.Trim(), fx, fy, confidence));
+        }
+        while (iterator.Next(PageIteratorLevel.Word));
+        return results;
+    }
+
+    /// <summary>
     /// Finds a line containing the expected text (case-insensitive) —
     /// androidtester's `screen.wait_for {text: ...}`. Returns the best match
     /// (highest confidence), or null when absent.

@@ -115,6 +115,9 @@ What works today:
 - **Linux tests**: `scripts/test-linux.sh` builds and runs the Docker `test` stage
   (Ubuntu 22.04, jammy natives, source-built Tesseract 5). Use this on newer distros;
   local `dotnet test` cannot load the prebuilt OpenCvSharp/OCR natives there.
+- **PIN-entry POC**: [docs/pin-entry-poc.md](docs/pin-entry-poc.md) — the physical
+  finger enters a PIN in the emulated DX8000 app; template-matches each keypad key,
+  calls `tap_at`, and asserts the accepted PIN.
 - **MCP server** (`MechMaker.Server`): 47 tools over stdio that let LLM agents assemble,
   wire, validate, compile, simulate, render, and drive real Android UIs — catalog
   browsing, part placement, typed-connector connections, board wiring, `mmNNN`
