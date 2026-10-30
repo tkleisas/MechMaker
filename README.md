@@ -112,6 +112,9 @@ What works today:
 - **Tests**: `dotnet test` (202 tests: core math/compile, engine physics, Lua scenarios,
   klipper wire+protocol, PWM components, HIL seam + physics taps + tap_at, transmission
   kinematics, server/session).
+- **Linux tests**: `scripts/test-linux.sh` builds and runs the Docker `test` stage
+  (Ubuntu 22.04, jammy natives, source-built Tesseract 5). Use this on newer distros;
+  local `dotnet test` cannot load the prebuilt OpenCvSharp/OCR natives there.
 - **MCP server** (`MechMaker.Server`): 47 tools over stdio that let LLM agents assemble,
   wire, validate, compile, simulate, render, and drive real Android UIs — catalog
   browsing, part placement, typed-connector connections, board wiring, `mmNNN`

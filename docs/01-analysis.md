@@ -127,8 +127,11 @@ in the status bar.
 ## The container — the portability gate
 
 `Dockerfile` runs the full suite — physics, engine, server, vision **and real
-OCR** — on **linux-x64** inside a container: `docker build -t mechmaker .` (the
-`test` stage is the image's health gate; `docker run --rm mechmaker` serves the
+OCR** — on **linux-x64** inside a container: `scripts/test-linux.sh` (or
+`docker build --target test -t mechmaker:test .`) is the local Linux test entry
+point. It uses Ubuntu 22.04 because the prebuilt OpenCvSharp native is linked
+against jammy-era sonames; newer distros cannot load it. The `test` stage is the
+image's health gate; `docker run --rm mechmaker` serves the
 MCP server over stdio, and `docker run --rm -p 8080:8080 mechmaker --http` serves
 **streamable HTTP** — the same 47 tools, remote-agent reachable — plus the
 human doors: **`/` is a three.js viewer** that renders the session machine's
