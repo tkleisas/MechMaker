@@ -27,8 +27,8 @@
     { "name": "mount", "type": "bolt_m3", "body": "root", "pose": { "pos": [0, 0, 0.006], "rot": [180, 0, 0] } }
   ],
   "params": {
-    "min_pos_m": -0.03,
-    "max_pos_m": 0.04,
+    "min_pos_m": -0.06,
+    "max_pos_m": 0.06,
     "servo_kp": 80.0,
     "servo_kv": 1.1
   },

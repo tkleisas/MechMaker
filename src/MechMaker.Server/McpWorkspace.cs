@@ -1,3 +1,4 @@
+using System.Globalization;
 using MechMaker.Core;
 using MechMaker.Core.Compilation;
 using MechMaker.Core.Model;
@@ -715,8 +716,9 @@ private HilSession RequireHil() =>
         var controller = new TapAtController(RequireRun(), phone.Id, finger.Id,
             carriage, stepper, screenWidth, YStepperOf(), screenHeight, screenPlane);
         var (achievedFx, achievedFy) = controller.Tap(fx, fy);
-        return $"Physical tap dispatched at ({achievedFx * 100:0.#}%, {achievedFy * 100:0.#}%) " +
-               $"(commanded ({fx * 100:0.#}%, {fy * 100:0.#}%)).";
+        static string P(double v) => (v * 100).ToString("0.#", CultureInfo.InvariantCulture);
+        return $"Physical tap dispatched at ({P(achievedFx)}%, {P(achievedFy)}%) " +
+               $"(commanded ({P(fx)}%, {P(fy)}%)).";
     }
 
     /// <summary>The part the finger mounts to (its connection partner).</summary>
@@ -737,7 +739,8 @@ private HilSession RequireHil() =>
             lines.Add(bridge.DispatchedTaps.Count == 0
                 ? "physics taps: armed, none dispatched yet"
                 : "physics taps dispatched at: " + string.Join("; ", bridge.DispatchedTaps
-                    .Select(t => $"({t.Fx * 100:0.#}%, {t.Fy * 100:0.#}%)")));
+                    .Select(t => $"({(t.Fx * 100).ToString("0.#", CultureInfo.InvariantCulture)}%, " +
+                                 $"{(t.Fy * 100).ToString("0.#", CultureInfo.InvariantCulture)}%)")));
         }
         else
         {

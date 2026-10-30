@@ -165,6 +165,21 @@ public partial class HilToolsTests : IDisposable
         Assert.True(rightFx > leftFx, $"expected rightward: {leftFx:0.###} -> {rightFx:0.###}");
     }
 
+    [Fact]
+    public void Tap_at_positions_the_dx8000_gantry_and_dispatches()
+    {
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "dx8000_hil_rig.json"));
+        Assert.Contains("device 'dut'", _w.HilConnect(_emulator));
+        _w.StartRun();
+        _w.ArmPhysicsTaps();
+
+        var result = _w.TapAt(0.5, 0.5);
+        Assert.Contains("Physical tap dispatched", result);
+        var fx = Fraction(result, "dispatched at (", "%");
+        Assert.InRange(fx, 0.40, 0.60);
+        Assert.Contains("physics taps dispatched", _w.HilStatus());
+    }
+
     private static double Fraction(string text, string prefix, string terminator)
     {
         var start = text.IndexOf(prefix, StringComparison.Ordinal) + prefix.Length;
