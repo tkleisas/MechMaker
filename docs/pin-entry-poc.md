@@ -47,3 +47,26 @@ emulator, install a test APK with the same keypad screen and connect with
 `HilConnect("adb", ...)`; the HIL session, template matching, `tap_at`, and
 physics bridge are unchanged. The fake and adb transports both work in screen
 fractions, so the same key templates and tap sequence apply.
+
+
+## Visual run
+
+`tools/pinvideo` renders the MechMaker cell and the emulated app at each physical
+tap and writes frames plus `steps.json` to `tools/pinvideo/out/` (gitignored).
+Run it with the test image so the OpenCV/MuJoCo natives are available:
+
+```bash
+# Build the test image once with scripts/test-linux.sh, then:
+docker run --rm -v "$PWD:/work" -w /work/tools/pinvideo \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e NUGET_PACKAGES=/tmp/nuget \
+  mechmaker:test dotnet run -c Release
+```
+
+The frame sequence shows the finger over each measured key, the PIN buffer
+growing from `----` to `****`, and the final `APPROVED` screen. Compose the GIF,
+MP4 and contact sheet with:
+
+```bash
+python3 tools/pinvideo/compose.py
+```

@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1",
   "name": "dx8000_hil_rig",
-  "description": "Dedicated DX8000 HIL gantry: screen-centre mount, two extra 20 mm standoffs (40 mm total) to clear the 62.5 mm head, two-axis gantry and touch finger.",
+  "description": "Dedicated DX8000 HIL gantry: screen-centre mount rotated 90 degrees so the portrait screen height runs along Y (the HIL width=X, height=Y convention), 40 mm raised gantry, two-axis gantry and touch finger.",
   "parts": [
     {
       "id": "deck",
@@ -129,7 +129,7 @@
       "part_a": "phone_plate",
       "connector_a": "motor_face",
       "part_b": "dut",
-      "connector_b": "nest_screen"
+      "connector_b": "nest_screen_rot90"
     },
     {
       "id": "standoff1_on_deck",
