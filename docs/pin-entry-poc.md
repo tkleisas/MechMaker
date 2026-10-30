@@ -70,3 +70,26 @@ MP4 and contact sheet with:
 ```bash
 python3 tools/pinvideo/compose.py
 ```
+
+
+## Live Android emulator E2E
+
+The `apps/android-pin` app is a real Android APK with the same keypad. Build and
+install it (see `apps/android-pin/README.md`), start an API 29 emulator at
+720 x 1440, then run:
+
+```bash
+cd /path/to/MechMaker
+docker run --rm --network host   -v "$PWD:/work"   -v "${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools:/android-tools"   -w /work/tools/pinlive   --user "$(id -u):$(id -g)"   -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e NUGET_PACKAGES=/tmp/nuget   -e MECHMAKER_TESSDATA=/repo/tessdata   mechmaker:test dotnet run -c Release -- \
+  --adb /android-tools/adb --serial emulator-5554 --pin 1234
+```
+
+The runner:
+
+1. force-stops and relaunches the app,
+2. reads the keypad with OCR (falling back to `uiautomator dump`),
+3. calls `tap_at` for each digit and OK on the DX8000 HIL rig,
+4. verifies `files/pin.txt` and the on-screen `APPROVED` state.
+
+The physical taps are still performed by the simulated finger; only the screen
+and input transport are the real Android emulator.

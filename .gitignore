@@ -485,3 +485,7 @@ out/
 
 # Tesseract language data (fetch with tools/fetch_tessdata.ps1)
 tessdata/
+
+# Android PinApp build artifacts
+apps/android-pin/build/
+apps/android-pin/debug.keystore
