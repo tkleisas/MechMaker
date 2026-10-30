@@ -8,8 +8,10 @@
       "name": "root",
       "mass_kg": 0.04,
       "shapes": [
-        { "kind": "cylinder", "extents": [0.006, 0.012, 0], "rgba": "0.3 0.3 0.35 1" },
-        { "kind": "cylinder", "extents": [0.004, 0.05, 0], "relative_pose": { "pos": [0.05, 0, 0.012], "rot": [90, 0, 0] }, "rgba": "0.3 0.3 0.35 1" }
+        { "kind": "cylinder", "extents": [0.006, 0.012, 0], "rgba": "0.55 0.58 0.62 1" },
+        { "kind": "box", "extents": [0.020, 0.020, 0.007], "relative_pose": { "pos": [0, 0, -0.0095] }, "rgba": "0.48 0.51 0.56 1", "collision": false, "contributes_mass": false },
+        { "kind": "box", "extents": [0.012, 0.024, 0.028], "relative_pose": { "pos": [0, 0, 0.020] }, "rgba": "0.48 0.51 0.56 1", "collision": false, "contributes_mass": false },
+        { "kind": "box", "extents": [0.100, 0.020, 0.016], "relative_pose": { "pos": [0.05, 0, 0.034] }, "rgba": "0.62 0.65 0.70 1", "collision": false, "contributes_mass": false }
       ]
     },
     {

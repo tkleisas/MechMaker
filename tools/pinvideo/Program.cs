@@ -44,7 +44,16 @@ int frame = 0;
 void Capture(string label, double? fx = null, double? fy = null)
 {
     sim.Simulator.RefreshKinematics();
-    var scene = sim.Simulator.GetScene();
+    var scene = sim.Simulator.GetScene().ToList();
+    scene.Add(new SceneShape(
+        Name: "bench",
+        Kind: SceneShapeKind.Box,
+        HalfX: 0.35, HalfY: 0.30, HalfZ: 0.006,
+        Px: 0, Py: 0, Pz: -0.016,
+        R00: 1, R01: 0, R02: 0,
+        R10: 0, R11: 1, R12: 0,
+        R20: 0, R21: 0, R22: 1,
+        R: 0.15, G: 0.16, B: 0.18, A: 1));
     var tris = SceneTessellator.Tessellate(scene, 28);
     var px = new SoftRenderer().RenderBgra(tris, camera, 1000, 1000);
     var robot = SceneRenderer.BgraToPng(px, 1000, 1000);
