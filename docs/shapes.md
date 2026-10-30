@@ -82,3 +82,24 @@ worldbody, with an absolute path so the MJCF can be loaded from a temp file.
 
 These can be added on the same seam: a shape kind, a volume/AABB rule, an MJCF geom
 emission, and a renderer case.
+
+## HIL devices
+
+A part that can act as the Android device under test declares:
+
+```json
+"hil_device": "android",
+"params": {
+  "screen_width_m": 0.068,
+  "screen_height_m": 0.136,
+  "screen_plane_z_m": 0.0,
+  "resolution_x": 720,
+  "resolution_y": 1440
+}
+```
+
+The HIL session finds the device by `hil_device`, and both the physics tap bridge
+and `tap_at` read the screen width/height/plane from the catalog. The device root
+is assumed to be the screen centre; the screen plane offset is along local +Z.
+This lets `android_phone` (screen at +2 mm) and `dx8000` (screen at 0) share the
+same loop.

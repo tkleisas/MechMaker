@@ -173,6 +173,23 @@
           0.002
         ]
       }
+    },
+    {
+      "name": "nest_screen",
+      "type": "bolt_m3",
+      "pose": {
+        "pos": [
+          0,
+          0,
+          -0.025
+        ],
+        "rot": [
+          180,
+          0,
+          0
+        ]
+      }
     }
-  ]
+  ],
+  "hil_device": "android"
 }

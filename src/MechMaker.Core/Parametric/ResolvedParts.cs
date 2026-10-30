@@ -38,6 +38,7 @@ public static class ResolvedParts
             Name = definition.Name,
             Category = definition.Category,
             Description = definition.Description,
+            HilDevice = definition.HilDevice,
             Bodies = definition.Bodies.Select(b => new PartBody
             {
                 Name = b.Name,

@@ -143,6 +143,11 @@ public sealed record PartDefinition
     public required string Name { get; init; }
     public PartCategory Category { get; init; }
     public string Description { get; init; } = "";
+
+    /// <summary>Optional HIL device class, e.g. "android". The HIL session finds a
+    /// part by this marker instead of a hardcoded catalog id.</summary>
+    public string? HilDevice { get; init; }
+
     public List<PartBody> Bodies { get; init; } = [];
     public List<ConnectorDefinition> Connectors { get; init; } = [];
     public MotorSpec? Motor { get; init; }

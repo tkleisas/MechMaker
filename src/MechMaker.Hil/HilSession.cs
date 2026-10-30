@@ -34,11 +34,12 @@ public sealed class HilSession
         PartCatalog catalog, string? phoneInstanceId = null)
     {
         var phone = phoneInstanceId is null
-            ? machine.Parts.FirstOrDefault(p => catalog.Find(p.Part)?.Id == "android_phone")
+            ? machine.Parts.FirstOrDefault(p => catalog.Find(p.Part)?.HilDevice == "android")
             : machine.Parts.FirstOrDefault(p => p.Id == phoneInstanceId);
         if (phone is null)
             throw new InvalidOperationException(
-                "No android_phone part in the machine — place one (catalog 'android_phone') before connecting.");
+                "No HIL device part in the machine — place one with hil_device='android' " +
+                "(android_phone or dx8000) before connecting.");
 
         var definition = catalog.Get(phone.Part);
         return new HilSession(transport, phone.Id,
@@ -72,6 +73,6 @@ public sealed class HilSession
     }
 
     public override string ToString() =>
-        $"HIL session: phone '{PhoneInstanceId}' screen {ScreenWidthM * 1000:0.#} x {ScreenHeightM * 1000:0.#} mm, " +
+        $"HIL session: device '{PhoneInstanceId}' screen {ScreenWidthM * 1000:0.#} x {ScreenHeightM * 1000:0.#} mm, " +
         $"emulator {Transport.Resolution.X}x{Transport.Resolution.Y} px ({Transport.GetType().Name})";
 }

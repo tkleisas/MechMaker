@@ -16,9 +16,11 @@
     "screen_width_m": 0.068,
     "screen_height_m": 0.144,
     "resolution_x": 540,
-    "resolution_y": 1170
+    "resolution_y": 1170,
+    "screen_plane_z_m": 0.002
   },
   "connectors": [
     { "name": "nest", "type": "bolt_m3", "pose": { "pos": [0, 0, -0.004], "rot": [180, 0, 0] } }
-  ]
+  ],
+  "hil_device": "android"
 }

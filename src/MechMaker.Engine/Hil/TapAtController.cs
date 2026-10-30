@@ -19,10 +19,12 @@ public sealed class TapAtController
     private readonly string? _yStepperInstanceId;
     private readonly double _screenWidthM;
     private readonly double _screenHeightM;
+    private readonly double _screenPlaneZM;
 
     public TapAtController(MachineSimulation simulation, string phoneInstanceId,
         string fingerInstanceId, string carriageInstanceId, string gantryStepperInstanceId,
-        double screenWidthM, string? yStepperInstanceId = null, double screenHeightM = 0.144)
+        double screenWidthM, string? yStepperInstanceId = null, double screenHeightM = 0.144,
+        double screenPlaneZM = 0.002)
     {
         _simulation = simulation;
         _phoneInstanceId = phoneInstanceId;
@@ -32,6 +34,7 @@ public sealed class TapAtController
         _yStepperInstanceId = yStepperInstanceId;
         _screenWidthM = screenWidthM;
         _screenHeightM = screenHeightM;
+        _screenPlaneZM = screenPlaneZM;
     }
 
     private string TipBody => $"{_fingerInstanceId}_tip";
@@ -200,7 +203,7 @@ public sealed class TapAtController
     private double TipZ() => _simulation.Simulator.GetBodyPosition(TipBody)[2];
 
     private double GlassZ() =>
-        _simulation.Simulator.GetBodyPosition(_phoneInstanceId)[2] + 0.002; // compiled box half-extent: the physical screen surface
+        _simulation.Simulator.GetBodyPosition(_phoneInstanceId)[2] + _screenPlaneZM;
 
     private double[] Body(string bodyName) => _simulation.Simulator.GetBodyPosition(bodyName);
 }

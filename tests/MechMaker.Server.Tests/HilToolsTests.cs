@@ -39,7 +39,7 @@ public partial class HilToolsTests : IDisposable
         var workspace = TestRepo.NewWorkspace(); // no phone
         try
         {
-            Assert.Contains("No android_phone", Assert.Throws<InvalidOperationException>(
+            Assert.Contains("No HIL device", Assert.Throws<InvalidOperationException>(
                 () => workspace.HilConnect("fake")).Message);
         }
         finally
@@ -52,15 +52,26 @@ public partial class HilToolsTests : IDisposable
     public void Connect_pairs_the_phone()
     {
         var result = _w.HilConnect(_emulator);
-        Assert.Contains("phone 'dut'", result);
+        Assert.Contains("device 'dut'", result);
         Assert.Contains("68 x 144 mm", result);
         Assert.Contains("540x1170 px", result);
     }
 
     [Fact]
+    public void Connect_finds_the_dx8000_device()
+    {
+        _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "dx8000_only.json"));
+
+        var result = _w.HilConnect(_emulator);
+
+        Assert.Contains("device 'dx8000'", result);
+        Assert.Contains("68 x 136 mm", result);
+    }
+
+    [Fact]
     public void The_phone_action_loop_tap_find_screencap()
     {
-        Assert.Contains("phone 'dut'", _w.HilConnect(_emulator));
+        Assert.Contains("device 'dut'", _w.HilConnect(_emulator));
 
         // 1. Screen state: a settings icon on the launcher.
         _emulator.AddApp("settings", 0.5, 0.8);
@@ -116,7 +127,7 @@ public partial class HilToolsTests : IDisposable
     public void Physics_taps_dispatch_when_the_finger_presses_the_glass()
     {
         _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "phone_test_rig.json"));
-        Assert.Contains("phone 'dut'", _w.HilConnect(_emulator));
+        Assert.Contains("device 'dut'", _w.HilConnect(_emulator));
         _w.StartRun();
         Assert.Contains("armed", _w.ArmPhysicsTaps());
 
@@ -139,7 +150,7 @@ public partial class HilToolsTests : IDisposable
         // fractions on the gantry rig; each tap lands in its commanded column
         // (within the belt's convergence tolerance) and dispatches to the emulator.
         _w.OpenMachine(Path.Combine(TestRepo.Root(), "examples", "phone_gantry_rig.json"));
-        Assert.Contains("phone 'dut'", _w.HilConnect(_emulator));
+        Assert.Contains("device 'dut'", _w.HilConnect(_emulator));
         _w.StartRun();
         _w.ArmPhysicsTaps();
 

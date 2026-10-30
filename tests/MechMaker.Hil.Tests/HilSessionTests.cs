@@ -49,12 +49,30 @@ public class HilSessionTests
         Assert.Equal((540, 1170), _emulator.Resolution);
     }
 
+
+    [Fact]
+    public void Connect_finds_a_dx8000_hil_device()
+    {
+        var machine = new MachineDefinition
+        {
+            Name = "dx8000_hil",
+            Parts = [new PartInstance { Id = "dx", Part = "dx8000" }]
+        };
+
+        var session = HilSession.Connect(_emulator, machine, _catalog);
+
+        Assert.Equal("dx", session.PhoneInstanceId);
+        Assert.Equal(0.068, session.ScreenWidthM, 6);
+        Assert.Equal(0.136, session.ScreenHeightM, 6);
+    }
+
     [Fact]
     public void Connect_without_a_phone_part_tells_you_to_place_one()
     {
         var empty = new MachineDefinition { Name = "x" };
-        Assert.Throws<InvalidOperationException>(
+        var error = Assert.Throws<InvalidOperationException>(
             () => HilSession.Connect(_emulator, empty, _catalog));
+        Assert.Contains("No HIL device", error.Message);
     }
 
     [Fact]

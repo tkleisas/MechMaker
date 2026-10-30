@@ -456,12 +456,16 @@ public string SetServoAngle(string instanceId, double degrees)
     {
         if (_hil is null)
             throw new InvalidOperationException("No HIL session — call hil_connect first.");
-        var phone = FindPhone() ?? throw new InvalidOperationException("No android_phone part.");
+        var phone = FindHilDevice() ?? throw new InvalidOperationException("No HIL device part (hil_device='android').");
         var finger = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "touch_finger")
-            ?? throw new InvalidOperationException("No touch_finger part — place one over the phone.");
+            ?? throw new InvalidOperationException("No touch_finger part — place one over the device.");
+        var phoneDef = Catalog.Get(phone.Part);
 
         _tapBridge = new PhysicsTapBridge(RequireRun(), phone.Id, finger.Id,
-            (fx, fy) => { _hil.Tap(fx, fy); });
+            (fx, fy) => { _hil.Tap(fx, fy); },
+            phoneDef.Params.GetValueOrDefault("screen_width_m", 0.068),
+            phoneDef.Params.GetValueOrDefault("screen_height_m", 0.144),
+            phoneDef.Params.GetValueOrDefault("screen_plane_z_m", 0.002));
         _tapBridge.Arm();
         _run!.Mcu.PostTick += () => _tapBridge.Tick();
         return $"Physics taps armed: '{finger.Id}' -> '{phone.Id}' screen " +
@@ -471,8 +475,8 @@ public string SetServoAngle(string instanceId, double degrees)
 
     private PhysicsTapBridge? _tapBridge;
 
-    private PartInstance? FindPhone() =>
-        _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "android_phone");
+    private PartInstance? FindHilDevice() =>
+        _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.HilDevice == "android");
 
     /// <summary>Connects a HIL session over a fake emulator (tests/offline) or adb.</summary>
     public string HilConnect(string transport = "fake", string? adbPath = null, string? adbSerial = null)
@@ -495,8 +499,8 @@ public string SetServoAngle(string instanceId, double degrees)
 
     private (int X, int Y) ResolvePhoneResolution()
     {
-        var phone = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "android_phone")
-            ?? throw new InvalidOperationException("No android_phone part in the machine.");
+        var phone = FindHilDevice()
+            ?? throw new InvalidOperationException("No HIL device part (hil_device='android') in the machine.");
         var definition = Catalog.Get(phone.Part);
         return ((int)definition.Params.GetValueOrDefault("resolution_x", 540),
                 (int)definition.Params.GetValueOrDefault("resolution_y", 1170));
@@ -683,7 +687,7 @@ private HilSession RequireHil() =>
         var bridge = _tapBridge ?? throw new InvalidOperationException(
             "Physics taps not armed — call arm_physics_taps first.");
 
-        var phone = FindPhone() ?? throw new InvalidOperationException("No android_phone part.");
+        var phone = FindHilDevice() ?? throw new InvalidOperationException("No HIL device part (hil_device='android').");
         var finger = _machine.Parts.FirstOrDefault(p => Catalog.Find(p.Part)?.Id == "touch_finger")
             ?? throw new InvalidOperationException("No touch_finger part.");
         var carriage = CarriageOf(finger.Id)
@@ -707,8 +711,9 @@ private HilSession RequireHil() =>
         var screenWidth = phoneDef.Params.GetValueOrDefault("screen_width_m", 0.068);
         var screenHeight = phoneDef.Params.GetValueOrDefault("screen_height_m", 0.144);
 
+        var screenPlane = phoneDef.Params.GetValueOrDefault("screen_plane_z_m", 0.002);
         var controller = new TapAtController(RequireRun(), phone.Id, finger.Id,
-            carriage, stepper, screenWidth, YStepperOf(), screenHeight);
+            carriage, stepper, screenWidth, YStepperOf(), screenHeight, screenPlane);
         var (achievedFx, achievedFy) = controller.Tap(fx, fy);
         return $"Physical tap dispatched at ({achievedFx * 100:0.#}%, {achievedFy * 100:0.#}%) " +
                $"(commanded ({fx * 100:0.#}%, {fy * 100:0.#}%)).";

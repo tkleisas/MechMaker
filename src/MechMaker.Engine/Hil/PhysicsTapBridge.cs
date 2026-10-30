@@ -20,10 +20,13 @@ public sealed class PhysicsTapBridge
     private readonly string _phoneInstanceId;
     private readonly string _fingerInstanceId;
     private readonly Action<double, double> _dispatchTap;
+    private readonly double _screenWidthM;
+    private readonly double _screenHeightM;
+    private readonly double _screenPlaneZM;
 
-    /// <summary>World-space pose of the phone body when armed (front face centre +
+    /// <summary>World-space pose of the device body when armed (screen centre +
     /// half-extents). Captured from the compile so mapping survives edits.</summary>
-    private double _phoneCx, _phoneCy, _phoneCz, _halfW, _halfH, _halfT;
+    private double _phoneCx, _phoneCy, _phoneCz, _halfW, _halfH, _screenZ;
     private bool _armed;
 
         /// <summary>Minimum world-Z approach depth (m) below the screen plane for a
@@ -33,12 +36,16 @@ public sealed class PhysicsTapBridge
     public double TriggerDepthM { get; set; } = 0.00002;
 
     public PhysicsTapBridge(MachineSimulation simulation, string phoneInstanceId,
-        string fingerInstanceId, Action<double, double> dispatchTap)
+        string fingerInstanceId, Action<double, double> dispatchTap,
+        double screenWidthM = 0.068, double screenHeightM = 0.144, double screenPlaneZM = 0.002)
     {
         _simulation = simulation;
         _phoneInstanceId = phoneInstanceId;
         _fingerInstanceId = fingerInstanceId;
         _dispatchTap = dispatchTap;
+        _screenWidthM = screenWidthM;
+        _screenHeightM = screenHeightM;
+        _screenPlaneZM = screenPlaneZM;
     }
 
     /// <summary>Arms the bridge: computes the phone's screen frame from its compiled
@@ -58,9 +65,9 @@ public sealed class PhysicsTapBridge
         _phoneCx = pos[0];
         _phoneCy = pos[1];
         _phoneCz = pos[2];
-        _halfW = 0.0355;  // screen_width_m / 2 (catalog params)
-        _halfH = 0.0755;
-        _halfT = 0.002;
+        _halfW = _screenWidthM / 2;
+        _halfH = _screenHeightM / 2;
+        _screenZ = _phoneCz + _screenPlaneZM;
         _armed = true;
     }
 
@@ -84,8 +91,7 @@ public sealed class PhysicsTapBridge
                 continue;
 
             // The press: tip below the screen plane by TriggerDepthM.
-            var screenZ = _phoneCz + _halfT;
-            if (screenZ - z < TriggerDepthM)
+            if (_screenZ - z < TriggerDepthM)
                 continue;
 
             var fx = (x - (_phoneCx - _halfW)) / (2 * _halfW);
