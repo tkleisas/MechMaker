@@ -6,13 +6,14 @@ Requires Pillow and ffmpeg (MP4 is skipped if ffmpeg is unavailable).
 """
 import json
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).resolve().parent
-SRC = HERE / "out"
+SRC = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else HERE / "out"
 steps = json.loads((SRC / "steps.json").read_text())
 
 BG = (30, 32, 36)
@@ -95,12 +96,15 @@ def last_with_pin(pin):
     return matches[-1] if matches else None
 
 
-# Contact sheet: Ready + one contact frame per tap.
+# Contact sheet: Ready, each completed digit, and the final approval.
 chosen = [0]
-for n in range(1, 6):
-    idx = next((i for i, s in enumerate(steps) if s.get("taps", 0) >= n), None)
-    if idx is not None:
-        chosen.append(idx)
+for length in range(1, 5):
+    matches = [i for i, s in enumerate(steps) if len(s["pin"]) == length]
+    if matches:
+        chosen.append(matches[0])
+accepted = [i for i, s in enumerate(steps) if s["accepted"]]
+if accepted:
+    chosen.append(accepted[0])
 chosen = chosen[:6]
 
 thumbs = [Image.open(composed[i]).convert("RGB") for i in chosen]
@@ -110,7 +114,7 @@ gap = 20
 sheet = Image.new("RGB", (3 * thumb_w + 4 * gap, 110 + 2 * thumb_h + 3 * gap), BG)
 d = ImageDraw.Draw(sheet)
 d.text((gap, 30), "DX8000 physical PIN entry — key frames", font=font(42, True), fill=FG)
-d.text((gap, 78), "Ready plus the contact frame for each physical tap.",
+d.text((gap, 78), "Ready, each completed digit, and the final approval.",
        font=font(24), fill=MUT)
 for i, image in enumerate(thumbs):
     row, col = divmod(i, 3)

@@ -93,3 +93,31 @@ The runner:
 
 The physical taps are still performed by the simulated finger; only the screen
 and input transport are the real Android emulator.
+
+## Live video with the emulator screen on the DX8000
+
+`tools/pinlivevideo` runs the same live E2E and records:
+
+- the DX8000 HIL rig at 30 fps,
+- the real Android emulator screenshot, projected onto the DX8000 screen as a
+  composited texture,
+- the finger/Y-nut close-up.
+
+Run it, then compose with the shared video script:
+
+```bash
+docker run --rm --network host \
+  -v "$PWD:/work" \
+  -v "${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools:/android-tools" \
+  -w /work/tools/pinlivevideo \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e NUGET_PACKAGES=/tmp/nuget \
+  mechmaker:test dotnet run -c Release -- \
+  --adb /android-tools/adb --serial emulator-5554 --pin 1234
+
+python3 tools/pinvideo/compose.py tools/pinlivevideo/out
+```
+
+The texture is a perspective composite of the emulator capture onto the physical
+screen quad, not a mesh material in the renderer. Frames are written to
+`tools/pinlivevideo/out/` (gitignored).
