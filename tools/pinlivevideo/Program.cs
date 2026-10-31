@@ -91,7 +91,7 @@ Mat RenderRobot(IEnumerable<SceneShape> scene, OrbitCamera cam)
     var px = new SoftRenderer().RenderBgra(SceneTessellator.Tessellate(scene.ToList(), 28), cam, 1000, 1000);
     return Cv2.ImDecode(SceneRenderer.BgraToPng(px, 1000, 1000), ImreadModes.Color);
 }
-Mat OverlayScreen(Mat robot, OrbitCamera cam, byte[] appPng, SceneShape screen)
+Mat OverlayScreen(Mat robot, Mat maskRender, OrbitCamera cam, byte[] appPng, SceneShape screen)
 {
     var corners = ScreenCorners(screen);
     var proj = corners.Select(p => Project(p, cam, robot.Width, robot.Height)).ToArray();
@@ -104,29 +104,82 @@ Mat OverlayScreen(Mat robot, OrbitCamera cam, byte[] appPng, SceneShape screen)
     else if (rotation == "180") Cv2.Rotate(src, src, RotateFlags.Rotate180);
     if (!args.Contains("--no-flip-x")) Cv2.Flip(src, src, FlipMode.Y);
     if (args.Contains("--flip-y")) Cv2.Flip(src, src, FlipMode.X);
-    var dstPts = proj.Select(p => new Point2f((float)p!.Value.X, (float)p.Value.Y)).ToArray();
+    // Use the actual screen silhouette from a screen-only magenta render. This
+    // removes the AABB-vs-mesh offset and maps the app to the visible screen.
+    using var screenOnly = RenderRobot(new[]
+    {
+        screen with { R = 1, G = 0, B = 1, A = 1 }
+    }, cam);
+    var projected = proj.Select(p => p is null ? (Point2f?)null : new Point2f((float)p.Value.X, (float)p.Value.Y)).ToArray();
+    var quad = projected.All(p => p is not null)
+        ? ScreenQuadFromMask(screenOnly, projected.Select(p => p!.Value).ToArray())
+        : null;
+    if (args.Contains("--debug"))
+    {
+        Cv2.ImEncode(".png", screenOnly, out var so);
+        File.WriteAllBytes(Path.Combine(outDir, "dbg_screenonly.png"), so);
+        Console.WriteLine("quad=" + (quad is null ? "null" : string.Join(";", quad.Select(p => $"{p.X:0.#},{p.Y:0.#}"))));
+    }
+    var dstPts = quad ?? projected.Where(p => p is not null).Select(p => p!.Value).ToArray();
     var srcPts = new[] { new Point2f(0, 0), new Point2f(src.Width, 0),
         new Point2f(src.Width, src.Height), new Point2f(0, src.Height) };
     var m = Cv2.GetPerspectiveTransform(srcPts, dstPts);
     using var warped = new Mat();
     Cv2.WarpPerspective(src, warped, m, robot.Size());
 
-    using var quad = new Mat(robot.Height, robot.Width, MatType.CV_8UC1, Scalar.Black);
-    Cv2.FillConvexPoly(quad, dstPts.Select(p => new Point((int)p.X, (int)p.Y)).ToArray(), Scalar.White);
-
-    var ch = Cv2.Split(robot);
-    using var blue = new Mat();
-    Cv2.Compare(ch[0], 18, blue, CmpType.GT);
-    using var br = new Mat(); Cv2.Subtract(ch[0], ch[2], br);
-    using var brMask = new Mat(); Cv2.Compare(br, 8, brMask, CmpType.GT);
-    using var bg = new Mat(); Cv2.Subtract(ch[0], ch[1], bg);
-    using var bgMask = new Mat(); Cv2.Compare(bg, 4, bgMask, CmpType.GT);
-    using var blueMask = new Mat(); Cv2.BitwiseAnd(blue, brMask, blueMask);
-    Cv2.BitwiseAnd(blueMask, bgMask, blueMask);
-    using var mask = new Mat(); Cv2.BitwiseAnd(quad, blueMask, mask);
+    // Magenta screen mask: B ~= R > G. This is the visible screen surface after
+    // occlusion by the finger, arm, bezel and head; the app image fills exactly it.
+    using var mask = new Mat();
+    Cv2.InRange(maskRender, new Scalar(70, 0, 70), new Scalar(255, 70, 255), mask);
+    if (args.Contains("--debug"))
+    {
+        Cv2.ImEncode(".png", maskRender, out var mr); File.WriteAllBytes(Path.Combine(outDir, "dbg_maskrender.png"), mr);
+        Cv2.ImEncode(".png", mask, out var mp); File.WriteAllBytes(Path.Combine(outDir, "dbg_mask.png"), mp);
+        Cv2.ImEncode(".png", warped, out var wp); File.WriteAllBytes(Path.Combine(outDir, "dbg_warp.png"), wp);
+    }
     warped.CopyTo(robot, mask);
     return robot;
 }
+IEnumerable<int[]> Permutations(int[] values)
+{
+    if (values.Length <= 1)
+    {
+        yield return values;
+        yield break;
+    }
+    for (var i = 0; i < values.Length; i++)
+    {
+        var rest = values.Where((_, j) => j != i).ToArray();
+        foreach (var tail in Permutations(rest))
+            yield return [values[i], .. tail];
+    }
+}
+
+Point2f[]? ScreenQuadFromMask(Mat maskImage, Point2f[] fallback)
+{
+    using var bin = new Mat();
+    Cv2.InRange(maskImage, new Scalar(60, 0, 60), new Scalar(255, 65, 255), bin);
+    Cv2.FindContours(bin, out var contours, out _, RetrievalModes.External,
+        ContourApproximationModes.ApproxSimple);
+    var contour = contours.OrderByDescending(c => Cv2.ContourArea(c)).FirstOrDefault();
+    if (contour is null || contour.Length < 4)
+        return null;
+
+    var approx = Cv2.ApproxPolyDP(contour, 0.02 * Cv2.ArcLength(contour, true), true);
+    var corners = approx.Select(p => new Point2f(p.X, p.Y)).ToList();
+    if (corners.Count < 4)
+        return null;
+
+    if (corners.Count != 4)
+        return null;
+
+    var shift = Arg("--shift") is { } shiftText
+        ? int.Parse(shiftText, CultureInfo.InvariantCulture) % 4
+        : 0;
+    _ = fallback;
+    return Enumerable.Range(0, 4).Select(k => corners[(shift + k) % 4]).ToArray();
+}
+
 Point2d? Project((double X, double Y, double Z) p, OrbitCamera cam, int w, int h)
 {
     var eye = cam.Eye();
@@ -202,8 +255,10 @@ if (oneFrame)
 {
     sim.Simulator.RefreshKinematics();
     var scene = sim.Simulator.GetScene().ToList(); scene.Add(bench); scene.AddRange(grid);
+    var maskScene = scene.Select(x => x.Name == screenShape.Name ? x with { R = 1, G = 0, B = 1, A = 1 } : x).ToList();
     using var robot = RenderRobot(scene, camera);
-    OverlayScreen(robot, camera, screenPng, screenShape);
+    using var mask = RenderRobot(maskScene, camera);
+    OverlayScreen(robot, mask, camera, screenPng, screenShape);
     Cv2.ImEncode(".png", robot, out var encoded);
     File.WriteAllBytes(Path.Combine(outDir, "test_overlay.png"), encoded);
     Console.WriteLine("wrote test_overlay.png");
@@ -238,8 +293,10 @@ void Capture()
     sim.Simulator.RefreshKinematics();
     var wideScene = sim.Simulator.GetScene().ToList();
     wideScene.Add(bench); wideScene.AddRange(grid);
+    var wideMaskScene = wideScene.Select(x => x.Name == screenShape.Name ? x with { R = 1, G = 0, B = 1, A = 1 } : x).ToList();
     using var robot = RenderRobot(wideScene, camera);
-    OverlayScreen(robot, camera, screenPng, screenShape);
+    using var wideMask = RenderRobot(wideMaskScene, camera);
+    OverlayScreen(robot, wideMask, camera, screenPng, screenShape);
     Cv2.ImEncode(".png", robot, out var robotPng);
     File.WriteAllBytes(Path.Combine(outDir, $"robot_{frameNo:00}.png"), robotPng);
 
@@ -253,8 +310,10 @@ void Capture()
         TargetX = finger[0], TargetY = finger[1] + 0.05, TargetZ = finger[2] - 0.02,
         Distance = 0.26, YawRad = 0.0, PitchRad = 0.12
     };
+    var closeMaskScene = closeScene.Select(x => x.Name == screenShape.Name ? x with { R = 1, G = 0, B = 1, A = 1 } : x).ToList();
     using var close = RenderRobot(closeScene, closeCam);
-    OverlayScreen(close, closeCam, screenPng, screenShape);
+    using var closeMask = RenderRobot(closeMaskScene, closeCam);
+    OverlayScreen(close, closeMask, closeCam, screenPng, screenShape);
     Cv2.ImEncode(".png", close, out var closePng);
     File.WriteAllBytes(Path.Combine(outDir, $"closeup_{frameNo:00}.png"), closePng);
 
